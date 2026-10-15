@@ -21,6 +21,6 @@
     "upgrade": "remotion upgrade",
     "lint": "tsc --noEmit",
     "render": "remotion render src/index.ts ProofCLI out/proofcli-demo.mp4 --codec=h264 --crf=20 --concurrency=2",
-    "poster": "remotion still src/index.ts ProofCLI out/demo-poster.png --frame=540 --scale=0.5"
+    "poster": "remotion still src/index.ts ProofCLI out/demo-poster.png --frame=600 --scale=0.5"
   }
 }
