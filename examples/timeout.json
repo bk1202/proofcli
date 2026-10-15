@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "name": "timeout",
+  "argv": [
+    "{python}",
+    "-c",
+    "import time; print('Starting', flush=True); time.sleep(30)"
+  ],
+  "timeout_seconds": 0.2,
+  "expect": {
+    "exit_code": 0,
+    "stdout_regex": "Starting"
+  }
+}

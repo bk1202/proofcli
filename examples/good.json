@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "name": "good export",
+  "argv": [
+    "{python}",
+    "-c",
+    "from pathlib import Path; import sys; Path('report.txt').write_bytes(b'verified output\\n'); print('Export complete'); print('diagnostic: clean', file=sys.stderr)"
+  ],
+  "timeout_seconds": 5,
+  "expect": {
+    "exit_code": 0,
+    "stdout_regex": "^Export complete\\r?\\n$",
+    "stderr_regex": "^diagnostic: clean\\r?\\n$",
+    "files": [
+      {
+        "path": "report.txt",
+        "min_size": 1
+      }
+    ]
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "name": "false success: missing output",
+  "argv": [
+    "{python}",
+    "-c",
+    "print('Export complete')"
+  ],
+  "timeout_seconds": 5,
+  "expect": {
+    "exit_code": 0,
+    "stdout_regex": "^Export complete\\r?\\n$",
+    "files": [
+      {
+        "path": "report.txt",
+        "min_size": 1
+      }
+    ]
+  }
+}

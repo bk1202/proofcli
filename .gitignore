@@ -1,0 +1,15 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+build/
+dist/
+.coverage
+htmlcov/
+.pytest_cache/
+.DS_Store
+Thumbs.db
+.proofcli/
+evidence-*/
+*-report.json

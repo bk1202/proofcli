@@ -1,0 +1,46 @@
+{
+  "version": 1,
+  "name": "CSV export acceptance check",
+  "argv": [
+    "{python}",
+    "{spec_dir}/export.py",
+    "input.csv",
+    "report.json"
+  ],
+  "inputs": [
+    {
+      "source": "fixtures/input.csv",
+      "dest": "input.csv"
+    }
+  ],
+  "timeout_seconds": 5,
+  "expect": {
+    "exit_code": 0,
+    "stdout_regex": "Export complete",
+    "files": [
+      {
+        "path": "report.json",
+        "min_size": 1,
+        "json_contains": {
+          "currency": "CAD",
+          "summary": {
+            "row_count": 3,
+            "total": "33.75"
+          }
+        }
+      },
+      {
+        "path": "report.csv",
+        "min_size": 1,
+        "csv": {
+          "columns": [
+            "id",
+            "customer",
+            "amount"
+          ],
+          "min_rows": 3
+        }
+      }
+    ]
+  }
+}
