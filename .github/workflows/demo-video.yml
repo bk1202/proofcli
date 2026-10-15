@@ -43,7 +43,10 @@ jobs:
       - run: npm run landscape-cover
         working-directory: demo
       - name: Decode both videos and verify dimensions, frames, duration, audio and covers
-        run: python tools/verify_demo_media.py
+        run: >-
+          python tools/verify_demo_media.py
+          --ffmpeg demo/node_modules/@remotion/compositor-linux-x64-gnu/ffmpeg
+          --ffprobe demo/node_modules/@remotion/compositor-linux-x64-gnu/ffprobe
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
         with:
           name: motion-demos-v1

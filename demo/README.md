@@ -32,7 +32,8 @@ python tools/verify_demo_media.py
 ```
 
 The verification step needs `ffmpeg` and `ffprobe` on PATH, or explicit paths via
-`--ffmpeg` and `--ffprobe`. It decodes both videos, checks their streams and frame
+`--ffmpeg` and `--ffprobe`. CI passes the paths to Remotion's bundled Linux binaries
+instead of depending on a system installation. It decodes both videos, checks their streams and frame
 counts, checks cover dimensions, and writes a dedicated SHA-256 manifest.
 AAC framing can add a few milliseconds to the container duration; video duration
 is exactly 900 frames / 30 fps.
