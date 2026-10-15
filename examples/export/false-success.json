@@ -28,6 +28,30 @@
             "row_count": 3,
             "total": "33.75"
           }
+        },
+        "json_equals": {
+          "currency": "CAD",
+          "summary": {
+            "row_count": 3,
+            "total": "33.75"
+          },
+          "rows": [
+            {
+              "id": "1",
+              "customer": "Ada",
+              "amount": "12.50"
+            },
+            {
+              "id": "2",
+              "customer": "Grace",
+              "amount": "8.25"
+            },
+            {
+              "id": "3",
+              "customer": "Linus",
+              "amount": "13.00"
+            }
+          ]
         }
       },
       {
@@ -39,7 +63,25 @@
             "customer",
             "amount"
           ],
-          "min_rows": 3
+          "min_rows": 3,
+          "exact_columns": true,
+          "rows": [
+            {
+              "id": "1",
+              "customer": "Ada",
+              "amount": "12.50"
+            },
+            {
+              "id": "2",
+              "customer": "Grace",
+              "amount": "8.25"
+            },
+            {
+              "id": "3",
+              "customer": "Linus",
+              "amount": "13.00"
+            }
+          ]
         }
       }
     ]

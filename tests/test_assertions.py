@@ -57,6 +57,7 @@ class FileContentTests(unittest.TestCase):
         for content in (
             "not JSON", '{"x":1,"x":2}', '{"nested":{"x":1,"x":2}}',
             '{"x":NaN}', '{"x":Infinity}', '{"x":-Infinity}', '{"x":1e10000}',
+            '{"x":"\\ud800"}', '{"\\ud800":1}',
         ):
             with self.subTest(content=content):
                 check = self.check(content, "json_contains", {})
@@ -139,6 +140,10 @@ class SemanticSpecTests(unittest.TestCase):
             ("csv", {"columns": ["id", "id"]}), ("csv", {"columns": [1]}),
             ("csv", {"min_rows": -1}), ("csv", {"min_rows": True}),
             ("csv", {"min_rows": 1.5}),
+            ("csv", {"columns": ["id"], "exact_columns": "yes"}),
+            ("csv", {"exact_columns": True}), ("csv", {"rows": [{}]}),
+            ("csv", {"rows": [{"id": 1}]}),
+            ("csv", {"columns": ["id"], "rows": [{"other": "1"}]}),
         ):
             with self.subTest(field=field, invalid=invalid):
                 with self.assertRaises(SpecError):

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "proofcli"
-version = "0.2.0"
+version = "0.3.0"
 description = "Verify command output contracts instead of trusting exit code zero."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -13,7 +13,7 @@ license-files = ["LICENSE"]
 authors = [{name = "ProofCLI contributors"}]
 dependencies = []
 classifiers = [
-  "Development Status :: 3 - Alpha",
+  "Development Status :: 4 - Beta",
   "Environment :: Console",
   "Operating System :: Microsoft :: Windows",
   "Operating System :: MacOS",

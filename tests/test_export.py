@@ -91,6 +91,17 @@ class ExportAcceptanceTests(unittest.TestCase):
         self.assertGreater((artifacts / "report.csv").stat().st_size, 0)
         self.assertFalse(Path(report["workdir"]).exists())
 
+    def test_exact_contract_catches_lying_summary_bad_values_and_extra_columns(self):
+        for fault in ("missing-record", "wrong-value", "extra-column"):
+            with self.subTest(fault=fault):
+                completed, report = self.invoke(fault + ".json")
+                self.assertEqual(completed.returncode, 1, report)
+                self.assertEqual(report["exit_code"], 0)
+                self.assertTrue(self.check(report, "file:report.json:json_contains")["passed"])
+                self.assertFalse(self.check(report, "file:report.csv:csv")["passed"])
+                if fault != "extra-column":
+                    self.assertFalse(self.check(report, "file:report.json:json_equals")["passed"])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -93,6 +93,22 @@ if os.name == "nt":
     _api.OpenThread.restype = wintypes.HANDLE
     _api.ResumeThread.argtypes = [wintypes.HANDLE]
     _api.ResumeThread.restype = wintypes.DWORD
+    _api.PeekNamedPipe.argtypes = [
+        wintypes.HANDLE, ctypes.c_void_p, wintypes.DWORD,
+        ctypes.c_void_p, ctypes.POINTER(wintypes.DWORD), ctypes.c_void_p,
+    ]
+    _api.PeekNamedPipe.restype = wintypes.BOOL
+
+
+def pipe_available(fd):
+    """Available anonymous-pipe bytes, or None when the writer has closed."""
+    import msvcrt
+    available = wintypes.DWORD()
+    if not _api.PeekNamedPipe(msvcrt.get_osfhandle(fd), None, 0, None, ctypes.byref(available), None):
+        if ctypes.get_last_error() in (109, 232):
+            return None
+        raise _failure("PeekNamedPipe")
+    return available.value
 
 
 def _failure(operation):

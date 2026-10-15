@@ -121,6 +121,11 @@ class QualityOfLifeTests(unittest.TestCase):
         self.assertEqual(legacy["stdout"], explicit["stdout"])
         self.assertEqual(legacy["exit_code"], explicit["exit_code"])
 
+    def test_json_option_can_precede_an_explicit_subcommand(self):
+        path = self.write_spec()
+        result = self.invoke(["--json", "run", path], json_output=False)
+        self.assert_report((result, json.loads(result.stdout)), 0, "passed")
+
     def test_json_report_is_saved_in_full_and_creates_parent_directory(self):
         path = self.write_spec()
         destination = self.root / "reports" / "run.json"
