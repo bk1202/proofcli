@@ -12,6 +12,7 @@ Maintainer-led review and real-process regressions against baseline `67ca72b` (0
 | Link/normalization aliases | Source inspection: outputs followed links and filenames used casefold without NFC. | Reject aliases/links; real filesystem tests where supported. |
 | Lost reports and vague failures | Write errors discarded completed evidence; semantic failures were booleans/counts. | Preserve reports/evidence; precise field/header/record diagnostics. |
 | Release gaps | Floating Actions, no sdist-install gate/changelog/release flow. | Immutable pins, hashed tools, clean installs/rebuilds, advisory checks, gated assets. |
+| Packaging checker path alias | Hosted distribution gates exposed resolved-target versus unresolved-temp-root comparisons on macOS `/var` and Windows short paths. | Canonicalize the extraction root; retain both platform distribution gates. |
 
 Baseline timings were single failure reproductions, not performance comparisons. Coverage also includes Unicode paths, malformed/oversized specs, device names, signals, unexpected exits, wrong data, input fingerprints, stale output, and report errors. Skips are explicit when the OS/filesystem cannot provide a feature. See `VALIDATION.md` and hosted CI for actual results; a test inventory is not proof of a pass.
 

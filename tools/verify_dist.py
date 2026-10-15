@@ -67,7 +67,9 @@ def main():
     assert len(wheels) == len(sources) == 1, "dist must contain exactly one wheel and one sdist"
     version = inspect_wheel(wheels[0])
     with tempfile.TemporaryDirectory(prefix="proofcli-package-") as directory:
-        root = Path(directory)
+        # macOS /var aliases and Windows 8.3 temp paths must use the same
+        # canonical root as each resolved extraction target.
+        root = Path(directory).resolve()
         install_and_exercise(wheels[0], root / "wheel")
         unpacked = root / "source"
         unpacked.mkdir()

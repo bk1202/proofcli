@@ -10,6 +10,8 @@ Local validation used Windows and CPython 3.10.6 on October 14, 2026.
 
 The final regression inventory has 89 tests. Hosted CI runs installed-command tests on Windows/macOS with Python 3.10/3.13, two wheel/sdist installation jobs, and an advisory job. Platform-specific skips are expected; never count a skip as a pass. Refer to the candidate/release workflow results for hosted outcomes rather than extrapolating from the Windows sandbox.
 
+The initial hosted candidate (`9aebb7e`) passed all four runtime-test jobs and the advisory job. Both distribution gates caught a checker bug comparing canonical extraction targets with noncanonical temporary roots (macOS `/var` and Windows 8.3 aliases). That check was fixed rather than disabled; packaging and release remain gated on the corrected candidate's results.
+
 Local temporary files use a writable workspace directory because the sandbox restricts atomic renames in its OS temp area. Those restrictions are not treated as a ProofCLI guarantee or a reason to weaken atomic report writing.
 
 See [the audit](docs/audit-0.3.md) for unresolved limits. Test results do not establish arbitrary semantic correctness, sandboxing, or universal production readiness.
