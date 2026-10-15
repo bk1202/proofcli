@@ -11,7 +11,7 @@ Run the command. Check its files. Report what passed and what failed.
 [![Runtime dependencies: 0](https://img.shields.io/badge/runtime_dependencies-0-2D8A56)](pyproject.toml)
 [![MIT license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
-**Windows · macOS · JSON contracts · Human and JSON reports**
+**Windows · macOS · Linux · JSON contracts · Human and JSON reports**
 
 [Quick start](#quick-start) · [See it fail](#see-it-fail) · [Checks](#what-you-can-check) · [Documentation](#documentation) · [Limitations](#limitations)
 
@@ -23,6 +23,10 @@ ProofCLI tests the output of command-line tools. Give it a command and a JSON co
 
 Use it for an exporter that drops records, a generator that writes an empty file, or an automated workflow that prints “done” before producing the expected result. A passing check means the declared assertions passed. The quality of those assertions still matters.
 
+[![Watch the 30-second ProofCLI demo](https://raw.githubusercontent.com/bk1202/proofcli/main/docs/assets/demo-poster.png)](https://github.com/bk1202/proofcli/releases/download/v0.4.0/proofcli-demo.mp4)
+
+**[Watch the 30-second demo](https://github.com/bk1202/proofcli/releases/download/v0.4.0/proofcli-demo.mp4)** · [Run the examples](examples/export) · [GitHub Action](#github-action)
+
 ## Quick start
 
 Use a virtual environment with an existing Python installation. Releases contain a universal wheel, source distribution, and SHA-256 checksums. This is not a standalone executable.
@@ -31,7 +35,7 @@ Windows (PowerShell):
 
 ```powershell
 py -3 -m venv .venv
-.venv\Scripts\python -m pip install https://github.com/bk1202/proofcli/releases/download/v0.3.0/proofcli-0.3.0-py3-none-any.whl
+.venv\Scripts\python -m pip install proofcli==0.4.0
 .venv\Scripts\proofcli --help
 ```
 
@@ -39,11 +43,11 @@ macOS:
 
 ```sh
 python3 -m venv .venv
-.venv/bin/python -m pip install https://github.com/bk1202/proofcli/releases/download/v0.3.0/proofcli-0.3.0-py3-none-any.whl
+.venv/bin/python -m pip install proofcli==0.4.0
 .venv/bin/proofcli --help
 ```
 
-Use the environment's `python -m proofcli` if the console command is not on PATH. From a checkout, use `python -m pip install .`. A versioned Git installation is also available: `python -m pip install git+https://github.com/bk1202/proofcli.git@v0.3.0` (requires Git). This project is not published to PyPI.
+Use the environment's `python -m proofcli` if the console command is not on PATH. From a checkout, use `python -m pip install .`. The [GitHub release](https://github.com/bk1202/proofcli/releases/tag/v0.4.0) also provides a wheel, source archive, and checksums. PyPI uploads follow successful GitHub release validation; see the [publishing workflow](https://github.com/bk1202/proofcli/actions/workflows/pypi.yml) for index availability.
 
 ### Run your first contract
 
@@ -140,6 +144,27 @@ See the [complete specification](docs/specification.md), [report format](docs/re
 
 ## Exit codes and CI
 
+### GitHub Action
+
+After checking out your repository, add one step:
+
+```yaml
+steps:
+  - uses: actions/checkout@v7
+  - uses: bk1202/proofcli@v0.4.0
+    id: proof
+    with:
+      spec: tests/export-contract.json
+```
+
+The Action sets up Python and runs the ProofCLI source bundled at that version. It requires no separate pip install and fails the step when verification fails. It exposes `report`, `status`, and `exit-code` outputs and writes a job summary. Use a full commit SHA instead of a tag when your workflow requires an immutable dependency.
+
+Optional `report` and `artifacts` inputs choose where evidence is saved. Upload reports with your CI's artifact step if you want them retained after the job. See the [Action guide](docs/github-action.md) for a complete workflow and failure handling.
+
+The [broken exporter workflow](.github/workflows/demo.yml) is intentionally red: its exit-code-only job passes while the ProofCLI job fails. This demonstrates a weak CI check; CI with suitable pytest or shell assertions can catch the same defect.
+
+### Exit codes
+
 | Exit | Meaning |
 | --- | --- |
 | `0` | Every requested assertion completed and passed, or `init`/`validate` succeeded. |
@@ -154,12 +179,15 @@ The child's actual exit code is separate; on POSIX a negative code indicates a s
 
 - Fresh directories prevent previous-run output from satisfying checks. Inputs are independent copies with byte counts/SHA-256 fingerprints. Output links/reparse points and hard-link aliases of staged inputs are rejected.
 - Each stream is bounded to 1 MiB in memory; overflow stops the command. Logs are not first written to unbounded temporary files. Specs and semantic file reads are also capped at 1 MiB.
+- Logs must be valid UTF-8. Invalid bytes fail capture and log assertions; reports retain the captured bytes as base64 plus decoding-error offsets. A handled interruption drains pending pipe bytes within the capture limit and a bounded wait.
 - Assertions run in a separate supervised process with an independent deadline. A pathological regex cannot indefinitely block the CLI.
 - Ordinary descendants are terminated on completion, timeout, and handled interruption: Job Objects on Windows, process groups on macOS. POSIX children that detach into another session can escape. SIGKILL, crashes, native uninterruptible I/O, and external filesystem races are not universally controllable.
 - **This is not a security sandbox.** Commands inherit your environment and user permissions. They can access other files/network, modify external state, and create arbitrarily large output files. There are no general CPU, memory, network, or disk quotas. Reports may contain sensitive argv and logs.
 - A pass proves only the declared properties of observed files and decoded logs. Weak assertions, unrepresentative fixtures, or an agent changing both code and expectations can still give false confidence. No visual, audio, business, or universal semantic correctness is established.
 
 See the [audit](docs/audit-0.3.md) for confirmed defects and remaining limits, and [validation evidence](VALIDATION.md) for actual test results and skipped cases. The project has not had an independent third-party security review.
+
+The [0.4 capture notes](docs/capture-0.4.md) document the invalid-byte false positive, interruption fix, and intentional compatibility change.
 
 ## Why not pytest or a shell script?
 
@@ -194,7 +222,7 @@ python -m pip install .
 python -m unittest discover -s tests -v
 ```
 
-CI exercises the installed wheel and fresh wheel/sdist installations on Windows/macOS. Build tools are hash-locked; Actions are pinned to commit IDs. [Release instructions](docs/releasing.md) describe validation, checksums, and assets.
+CI exercises the installed wheel on Windows, macOS, and Linux, fresh wheel/sdist installations on Windows/macOS, and the composite Action on all three platforms. Build tools are hash-locked; Actions are pinned to commit IDs. [Release instructions](docs/releasing.md) describe validation, checksums, and PyPI publication.
 
 See [CHANGELOG](CHANGELOG.md), [SECURITY](SECURITY.md), and [CONTRIBUTING](CONTRIBUTING.md). Licensed under [MIT](LICENSE).
 

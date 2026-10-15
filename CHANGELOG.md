@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.4.0 — 2026-10-15
+
+### Fixed
+
+- Reject invalid UTF-8 in captured logs instead of letting replacement characters satisfy regex assertions. Reports retain the offending captured bytes as base64 and identify the first decoding error.
+- Drain pending pipe data after handled interruption, within the existing capture and drain limits.
+- Include truncation, incomplete-pipe, and encoding diagnostics in the output-capture check.
+
+### Added
+
+- A composite GitHub Action with Python setup, reports, exit-code propagation, and a job summary. No package installation is needed by consumers.
+- A 30-second demo built from actual exporter and CLI results, plus an intentionally failing workflow that contrasts an exit-code-only step with output verification.
+- PyPI Trusted Publishing after successful GitHub release validation, using the same checksum-verified distribution files.
+- Linux runtime and cross-platform Action integration checks.
+
+### Compatibility
+
+Invalid UTF-8 output now fails verification, including contracts with file-only checks. Decoded log fields remain available for inspection; `output_bytes_base64` preserves the captured prefix for invalid streams. Binary logs are not supported as passing text output. Existing UTF-8 contracts and spec version 1 remain supported.
+
 ## 0.3.0 — 2026-10-15
 
 ### Fixed

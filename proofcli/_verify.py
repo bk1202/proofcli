@@ -16,6 +16,10 @@ def evaluate(payload):
     for stream in ("stdout", "stderr"):
         key = stream + "_regex"
         if key in spec["expect"]:
+            if stream in payload.get("encoding_errors", {}):
+                checks.append(_check(key, False, spec["expect"][key],
+                                     {"error": "stream is not valid UTF-8; inspect output_bytes_base64 for captured bytes"}))
+                continue
             matched = re.search(spec["expect"][key], payload[stream]) is not None
             checks.append(_check(key, matched, spec["expect"][key], {"matched": matched}))
     for expected in spec["expect"]["files"]:

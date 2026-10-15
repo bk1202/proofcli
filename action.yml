@@ -1,0 +1,44 @@
+name: ProofCLI
+description: Run a command contract and fail when its output does not match.
+author: ProofCLI contributors
+branding:
+  icon: check-circle
+  color: blue
+inputs:
+  spec:
+    description: Path to the JSON contract, relative to the checked-out workspace.
+    required: true
+  report:
+    description: Optional JSON report path. Defaults to a new runner temporary directory.
+    required: false
+  artifacts:
+    description: Optional new directory for retained output files.
+    required: false
+outputs:
+  report:
+    description: Absolute path to the JSON report.
+    value: ${{ steps.verify.outputs.report }}
+  status:
+    description: ProofCLI report status.
+    value: ${{ steps.verify.outputs.status }}
+  exit-code:
+    description: ProofCLI exit code, separate from the child command exit code.
+    value: ${{ steps.verify.outputs.exit-code }}
+runs:
+  using: composite
+  steps:
+    - name: Set up Python
+      id: python
+      uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+      with:
+        python-version: '3.13'
+    - name: Verify command output
+      id: verify
+      shell: bash
+      env:
+        PROOFCLI_ACTION_PATH: ${{ github.action_path }}
+        PROOFCLI_PYTHON: ${{ steps.python.outputs.python-path }}
+        PROOFCLI_SPEC: ${{ inputs.spec }}
+        PROOFCLI_REPORT: ${{ inputs.report }}
+        PROOFCLI_ARTIFACTS: ${{ inputs.artifacts }}
+      run: '"$PROOFCLI_PYTHON" "$PROOFCLI_ACTION_PATH/.github/proofcli_action.py"'

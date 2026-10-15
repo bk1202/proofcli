@@ -1,0 +1,23 @@
+{
+  "ordinary": {
+    "exit_code": 0,
+    "stdout": "Export complete: report.json and report.csv"
+  },
+  "proofcli": {
+    "status": "failed",
+    "exit_code": 1,
+    "child_exit_code": 0,
+    "difference": {
+      "path": "$/rows/1/amount",
+      "reason": "value or type differs",
+      "expected": "8.25",
+      "actual": "999.00"
+    }
+  },
+  "record": {
+    "id": "2",
+    "customer": "Grace",
+    "amount": "999.00"
+  },
+  "fixture_sha256": "8d342b24d9eeb872c0edebec1e61dcf5b63c6f6a87668d0416172356166f6fea"
+}

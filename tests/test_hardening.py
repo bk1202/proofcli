@@ -1,6 +1,7 @@
 """Adversarial regressions using real processes, files, pipes, and signals."""
 
 import hashlib
+import base64
 import json
 import os
 from pathlib import Path
@@ -66,6 +67,46 @@ class HardeningTests(unittest.TestCase):
         result, report = self.invoke(self.spec("import os; os.write(1,b'x'*1048576)", expect={"stdout_regex": "^x+$"}))
         self.assertEqual(result.returncode, 0, report)
         self.assertFalse(report["output_truncated"]["stdout"])
+
+    def test_invalid_utf8_cannot_pass_by_matching_a_replacement_character(self):
+        for stream, fd in (("stdout", 1), ("stderr", 2)):
+            with self.subTest(stream=stream):
+                result, report = self.invoke(self.spec(
+                    f"import os; os.write({fd},bytes([255,0,254]))",
+                    expect={stream + "_regex": "\ufffd"}))
+                self.assertEqual(result.returncode, 1, report)
+                self.assertIn(stream, report["output_encoding_errors"])
+                self.assertEqual(base64.b64decode(report["output_bytes_base64"][stream]), b"\xff\x00\xfe")
+                check = next(c for c in report["checks"] if c["name"] == stream + "_regex")
+                self.assertFalse(check["passed"])
+                self.assertIn("UTF-8", check["actual"]["error"])
+
+    def test_valid_utf8_replacement_character_and_split_multibyte_output_pass(self):
+        result, report = self.invoke(self.spec(
+            "import os; os.write(1,('x'*65535+'\u20ac\ufffd').encode('utf-8'))",
+            expect={"stdout_regex": "\u20ac\ufffd$"}))
+        self.assertEqual(result.returncode, 0, report)
+        self.assertEqual(report["output_encoding_errors"], {})
+        self.assertEqual(report["output_bytes_base64"], {})
+
+    def test_invalid_utf8_fails_capture_even_without_a_log_assertion(self):
+        result, report = self.invoke(self.spec(
+            "import os; from pathlib import Path; Path('out').write_text('ok'); os.write(1,b'\\xff')",
+            expect={"files": [{"path": "out", "min_size": 2}]}))
+        self.assertEqual(result.returncode, 1, report)
+        capture = next(c for c in report["checks"] if c["name"] == "output_capture")
+        self.assertFalse(capture["passed"])
+        self.assertEqual(capture["actual"]["encoding_errors"]["stdout"]["start"], 0)
+
+    @unittest.skipIf(os.name == "nt", "POSIX child-to-parent signal delivery")
+    def test_interruption_drains_bytes_written_immediately_before_signal(self):
+        result, report = self.invoke(self.spec(
+            "import os,signal,time; os.write(1,b'last stdout'); os.write(2,b'last stderr'); "
+            "os.kill(os.getppid(),signal.SIGTERM); time.sleep(5)"))
+        self.assertEqual(result.returncode, 143, report)
+        self.assertEqual(report["stdout"], "last stdout")
+        self.assertEqual(report["stderr"], "last stderr")
+        self.assertFalse(report["output_incomplete"])
 
     def test_backtracking_regex_has_an_independent_deadline(self):
         started = time.monotonic()
@@ -277,6 +318,7 @@ class HardeningTests(unittest.TestCase):
         report = json.loads(result.stdout)
         self.assertEqual(result.returncode, 143, report)
         self.assertEqual(report["status"], "interrupted")
+        self.assertEqual(report["stdout"], "started\n" if os.name != "nt" else "started\r\n")
         self.assertEqual(json.loads(report_path.read_text(encoding="utf-8")), report)
         self.assertFalse(Path(report["workdir"]).exists())
 
