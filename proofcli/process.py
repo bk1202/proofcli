@@ -60,6 +60,36 @@ def _terminate(process, job):
 
 
 def run_process(argv, cwd, timeout, *, env=None):
+    """Defer owned interrupt handlers until a complete pipe read is retained.
+
+    Raising from a signal handler can discard bytes already consumed by os.read
+    before Python stores its return value. Latching requests also keeps spawn
+    and bounded cleanup from being interrupted between ownership operations.
+    """
+    pending = [None]
+    handlers = {}
+    def requested(signum, frame):
+        if pending[0] is None:
+            pending[0] = signum
+    try:
+        for signum in dict.fromkeys((signal.SIGINT, signal.SIGTERM, getattr(signal, "SIGBREAK", signal.SIGINT))):
+            original = signal.getsignal(signum)
+            if original is signal.default_int_handler or getattr(original, "_proofcli_interrupt", False):
+                try:
+                    signal.signal(signum, requested)
+                except ValueError:  # Embedded invocation outside the main thread.
+                    break
+                handlers[signum] = original
+        result = _run_process(argv, cwd, timeout, env=env, pending=pending)
+    finally:
+        for signum, handler in handlers.items():
+            signal.signal(signum, handler)
+    if pending[0] is not None:
+        result.interrupted_signal = pending[0]
+    return result
+
+
+def _run_process(argv, cwd, timeout, *, env, pending):
     """Retain at most CAPTURE_LIMIT bytes per stream and stop on first overflow.
 
     Pipes are read only when ready. A detached process retaining a pipe cannot
@@ -116,6 +146,9 @@ def run_process(argv, cwd, timeout, *, env=None):
         draining_until = None
         while True:
             progressed = collect_available()
+            if pending[0] is not None:
+                result.interrupted_signal = pending[0]
+                break
             now = time.monotonic()
             if not cleaned:
                 result.timed_out = process.poll() is None and now - started >= timeout
@@ -141,8 +174,9 @@ def run_process(argv, cwd, timeout, *, env=None):
             try:
                 if not cleaned:
                     _terminate(process, job)
-                    # An interrupt may arrive after the child wrote to a pipe
-                    # but before the next polling iteration collected it.
+                if not cleaned or pending[0] is not None:
+                    # Retain queued bytes even if interruption arrived during
+                    # final draining after ordinary process-tree cleanup.
                     drain()
                 result.returncode = process.returncode
             except (OSError, subprocess.TimeoutExpired) as exc:
