@@ -7,6 +7,7 @@
   "private": true,
   "dependencies": {
     "@remotion/cli": "4.0.535",
+    "@remotion/media": "4.0.535",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "remotion": "4.0.535"
@@ -21,6 +22,10 @@
     "upgrade": "remotion upgrade",
     "lint": "tsc --noEmit",
     "render": "remotion render src/index.ts ProofCLI out/proofcli-demo.mp4 --codec=h264 --crf=20 --concurrency=2",
-    "poster": "remotion still src/index.ts ProofCLI out/demo-poster.png --frame=600 --scale=0.5"
+    "poster": "remotion still src/index.ts ProofCLI out/demo-poster.png --frame=600 --scale=0.5",
+    "reel": "remotion render src/index.ts InstagramReel out/proofcli-instagram-reel-v1.mp4 --codec=h264 --crf=18 --color-space=bt709 --pixel-format=yuv420p --concurrency=2",
+    "landscape": "remotion render src/index.ts LandscapeMotion out/proofcli-landscape-motion-v1.mp4 --codec=h264 --crf=18 --color-space=bt709 --pixel-format=yuv420p --concurrency=2",
+    "reel-cover": "remotion still src/index.ts ReelCover out/proofcli-instagram-cover-v1.png",
+    "landscape-cover": "remotion still src/index.ts LandscapeCover out/proofcli-landscape-cover-v1.png"
   }
 }
