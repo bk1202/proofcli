@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.4.1 — 2026-10-15
+
+### Fixed
+
+- Latch handled interrupts while supervising a process instead of raising between a pipe read and saving its bytes. A macOS CI run exposed this timing-sensitive output-loss case after the 0.4.0 drain fix.
+- Preserve bounded pipe draining when an interrupt arrives after process-tree cleanup has started. The real child-to-parent signal regression now repeats 20 times per POSIX test run.
+
+No contract or report schema changes. Custom caller-installed signal handlers and ignored/default signals remain unchanged; ProofCLI defers only its own interruption handlers and Python's standard Ctrl+C handler during supervision.
+
 ## 0.4.0 — 2026-10-15
 
 ### Fixed

@@ -216,6 +216,7 @@ def _main(argv=None):
 def main(argv=None):
     def interrupted(signum, frame):
         raise RunInterrupted(signum)
+    interrupted._proofcli_interrupt = True
     handlers = {}
     try:
         for signum in (signal.SIGTERM, getattr(signal, "SIGBREAK", signal.SIGINT)):

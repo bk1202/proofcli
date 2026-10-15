@@ -100,13 +100,17 @@ class HardeningTests(unittest.TestCase):
 
     @unittest.skipIf(os.name == "nt", "POSIX child-to-parent signal delivery")
     def test_interruption_drains_bytes_written_immediately_before_signal(self):
-        result, report = self.invoke(self.spec(
-            "import os,signal,time; os.write(1,b'last stdout'); os.write(2,b'last stderr'); "
-            "os.kill(os.getppid(),signal.SIGTERM); time.sleep(5)"))
-        self.assertEqual(result.returncode, 143, report)
-        self.assertEqual(report["stdout"], "last stdout")
-        self.assertEqual(report["stderr"], "last stderr")
-        self.assertFalse(report["output_incomplete"])
+        # Repeated real delivery exercises scheduling around os.read, including
+        # the interval after kernel consumption but before Python assignment.
+        for attempt in range(20):
+            with self.subTest(attempt=attempt):
+                result, report = self.invoke(self.spec(
+                    "import os,signal,time; os.write(1,b'last stdout'); os.write(2,b'last stderr'); "
+                    "os.kill(os.getppid(),signal.SIGTERM); time.sleep(5)"))
+                self.assertEqual(result.returncode, 143, report)
+                self.assertEqual(report["stdout"], "last stdout")
+                self.assertEqual(report["stderr"], "last stderr")
+                self.assertFalse(report["output_incomplete"])
 
     def test_backtracking_regex_has_an_independent_deadline(self):
         started = time.monotonic()
@@ -116,6 +120,27 @@ class HardeningTests(unittest.TestCase):
         self.assertFalse(report["verification_complete"])
         self.assertLess(time.monotonic() - started, 4)
         self.assertIn("deadline", str(report["checks"]))
+
+    @unittest.skipIf(os.name == "nt", "POSIX custom and ignored signal delivery")
+    def test_process_api_preserves_custom_and_ignored_signal_handlers(self):
+        from proofcli.process import run_process
+        seen = []
+        def custom(signum, frame):
+            seen.append(signum)
+        for signum, handler in ((signal.SIGINT, custom), (signal.SIGTERM, signal.SIG_IGN)):
+            with self.subTest(signum=signum):
+                previous = signal.signal(signum, handler)
+                try:
+                    result = run_process([sys.executable, "-c",
+                        f"import os,time; os.write(1,b'present'); os.kill(os.getppid(),{int(signum)}); time.sleep(.05)"],
+                        self.root, 3)
+                    self.assertEqual(result.returncode, 0)
+                    self.assertIsNone(result.interrupted_signal)
+                    self.assertEqual(result.stdout, "present")
+                    self.assertEqual(signal.getsignal(signum), handler)
+                finally:
+                    signal.signal(signum, previous)
+        self.assertEqual(seen, [signal.SIGINT])
 
     def test_json_rounding_cannot_create_a_false_positive(self):
         result, report = self.invoke(self.spec(
