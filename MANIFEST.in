@@ -1,5 +1,7 @@
 include LICENSE README.md CONTRIBUTING.md
+include CHANGELOG.md SECURITY.md VALIDATION.md requirements-build.txt
 recursive-include examples *.json *.py *.csv
 recursive-include docs *.md
 recursive-include tests *.py
+recursive-include tools *.py
 recursive-include .github *.yml

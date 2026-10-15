@@ -1,11 +1,10 @@
 """Run one synchronous process in a fresh directory and inspect its results."""
 
 import os
-import re
+import hashlib
+import json
 import shutil
-import signal
 import stat
-import subprocess
 import sys
 import tempfile
 import time
@@ -13,9 +12,7 @@ from contextlib import contextmanager
 from pathlib import Path
 
 from .spec import SpecError, validate_spec
-from .assertions import validate_file_content
-
-CAPTURE_LIMIT = 1024 * 1024
+from .process import CAPTURE_LIMIT, run_process
 
 
 def _check(name, passed, expected, actual):
@@ -41,61 +38,14 @@ def _executable(argv):
         raise SpecError("executable must be an absolute path or a name on PATH")
     resolved = shutil.which(program)
     if resolved:
-        resolved = str(Path(resolved).resolve())
-        if os.name == "nt" and Path(resolved).suffix.lower() in (".cmd", ".bat"):
+        if os.name == "nt" and Path(resolved).resolve().suffix.lower() in (".cmd", ".bat"):
             raise SpecError("Windows .cmd/.bat executables require a shell; invoke an explicit interpreter instead")
-        argv[0] = resolved
+        # Dereferencing a venv's Python symlink silently discards that environment.
+        argv[0] = os.path.abspath(resolved)
     else:
         # Do not fall through to the OS loader's different PATH/PATHEXT rules.
         raise FileNotFoundError(f"executable not found: {program}")
     return argv
-
-
-def _stop(process, job):
-    try:
-        if job is not None:
-            job.terminate()
-        else:
-            try:
-                os.killpg(process.pid, signal.SIGKILL)
-            except ProcessLookupError:
-                pass
-    finally:
-        # A job API failure must not strand an unassigned, suspended process.
-        if process.poll() is None:
-            process.kill()
-        process.wait(timeout=5)
-
-
-def _execute(argv, root, out, err, timeout):
-    job = None
-    if os.name == "nt":
-        from .winjob import WindowsJob
-        job = WindowsJob()
-    try:
-        process = subprocess.Popen(
-            argv, cwd=root, stdin=subprocess.DEVNULL, stdout=out, stderr=err,
-            shell=False, start_new_session=(os.name != "nt"),
-            # Assign the suspended process to the job before it can spawn children.
-            creationflags=(subprocess.CREATE_NEW_PROCESS_GROUP | 0x00000004) if job else 0,
-        )
-        try:
-            if job:
-                job.assign(int(process._handle))
-                job.resume(process.pid)
-            try:
-                process.wait(timeout=timeout)
-            except subprocess.TimeoutExpired:
-                _stop(process, job)
-                return process.returncode, True
-        except BaseException:
-            # Also handles assignment/resume failure before any user code executes.
-            _stop(process, job)
-            raise
-        return process.returncode, False
-    finally:
-        if job:
-            job.close()
 
 
 @contextmanager
@@ -121,24 +71,26 @@ def _work_directory():
                 time.sleep(0.1)
 
 
-def _capture(handle):
-    handle.seek(0)
-    data = handle.read(CAPTURE_LIMIT + 1)
-    return data[:CAPTURE_LIMIT].decode("utf-8", errors="replace"), len(data) > CAPTURE_LIMIT
-
-
-def _file_check(root, expected):
+def _file_check(root, expected, input_identities=()):
     name = expected["path"]
     minimum = expected.get("min_size", 0)
     target = root.joinpath(*name.split("/"))
     actual = {"exists": False, "size": None}
     try:
-        # Resolve symlinks/junctions before accepting any output, including parent dirs.
+        current = root
+        for part in name.split("/"):
+            current = current / part
+            entry = current.lstat()
+            if stat.S_ISLNK(entry.st_mode) or getattr(entry, "st_file_attributes", 0) & 0x400:
+                raise OSError("output paths must not use symlinks or reparse points")
+        # Retain the containment check after rejecting links in every component.
         resolved = target.resolve()
         if not resolved.is_relative_to(root):
             actual["error"] = "path resolves outside the work directory"
             return _check(f"file:{name}", False, {"regular_file": True, "min_size": minimum}, actual)
         info = resolved.stat()
+        if [info.st_dev, info.st_ino] in input_identities:
+            raise OSError("output aliases a staged input; a distinct output file is required")
         actual.update(exists=True, size=info.st_size, regular_file=stat.S_ISREG(info.st_mode))
         passed = actual["regular_file"] and info.st_size >= minimum
     except (OSError, RuntimeError) as exc:
@@ -150,24 +102,67 @@ def _file_check(root, expected):
 def _resolve_inputs(spec, spec_dir):
     sources = []
     for item in spec.get("inputs", []):
-        source = spec_dir.joinpath(*item["source"].split("/")).resolve()
+        try:
+            source = spec_dir.joinpath(*item["source"].split("/")).resolve()
+        except RuntimeError as exc:
+            raise SpecError(f"cannot resolve input: {item['source']}: {exc}") from exc
         if not source.is_relative_to(spec_dir) or not source.is_file():
             raise SpecError(f"input must be a regular file inside the spec directory: {item['source']}")
         sources.append((source, item["dest"]))
     return sources
 
 
-def _save_artifacts(root, expected_files, destination):
+def _save_artifacts(root, expected_files, destination, input_identities):
     saved = []
     for expected in expected_files:
-        source = root.joinpath(*expected["path"].split("/")).resolve()
-        if not source.is_relative_to(root) or not source.is_file():
+        if not _file_check(root, {"path": expected["path"]}, input_identities)["passed"]:
             continue
+        source = root.joinpath(*expected["path"].split("/")).resolve()
         target = destination.joinpath(*expected["path"].split("/"))
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(source, target)
         saved.append({"path": expected["path"], "saved_to": str(target), "size": target.stat().st_size})
     return saved
+
+
+def _stage_input(source, target):
+    before = source.stat()
+    target.parent.mkdir(parents=True, exist_ok=True)
+    digest = hashlib.sha256()
+    with source.open("rb") as reader, target.open("xb") as writer:
+        while True:
+            chunk = reader.read(65536)
+            if not chunk:
+                break
+            writer.write(chunk)
+            digest.update(chunk)
+    after = source.stat()
+    if (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns) != (
+        after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns
+    ):
+        raise SpecError(f"fixture changed while copying: {source}")
+    copied = target.stat()
+    return {"sha256": digest.hexdigest(), "size": copied.st_size}, [copied.st_dev, copied.st_ino]
+
+
+def _verify(spec, root, report, identities):
+    with tempfile.TemporaryDirectory(prefix="proofcli-verify-") as directory:
+        payload = Path(directory) / "input.json"
+        output = Path(directory) / "checks.json"
+        payload.write_text(json.dumps({"spec": spec, "root": str(root), "stdout": report["stdout"],
+                                       "stderr": report["stderr"], "input_identities": identities}), encoding="utf-8")
+        env = os.environ.copy()
+        env["PYTHONPATH"] = str(Path(__file__).resolve().parent.parent) + os.pathsep + env.get("PYTHONPATH", "")
+        result = run_process([sys.executable, "-m", "proofcli._verify", str(payload), str(output)],
+                             directory, spec["verification_timeout_seconds"], env=env)
+        if result.interrupted_signal:
+            report["interrupted_signal"] = result.interrupted_signal
+        if result.returncode != 0 or result.timed_out or result.error or result.interrupted_signal:
+            reason = "assertion deadline exceeded" if result.timed_out else result.error or result.stderr or "assertion worker interrupted or failed"
+            return [_check("verification", False, "all assertions completed within the deadline", reason)], False
+        if not output.is_file() or output.stat().st_size > 8 * 1024 * 1024:
+            return [_check("verification", False, "bounded assertion report", "missing or oversized worker report")], False
+        return json.loads(output.read_text(encoding="utf-8")), True
 
 
 def run_spec(spec, *, spec_dir=None, artifacts_dir=None):
@@ -190,50 +185,51 @@ def run_spec(spec, *, spec_dir=None, artifacts_dir=None):
         "exit_code": None, "timed_out": False, "duration_seconds": 0,
         "workdir": None, "stdout": "", "stderr": "", "checks": [],
         "artifacts_dir": str(destination) if destination else None, "artifacts": [],
+        "inputs": [], "verification_complete": False, "interrupted_signal": None,
     }
     checks = report["checks"]
-    # Capture outside the workdir so child output cannot collide with expected files.
-    # Files rather than pipes avoid deadlock when descendants inherit output handles.
-    with _work_directory() as directory:
-        root = Path(directory).resolve()
-        report["workdir"] = str(root)
-        for source, relative in sources:
-            target = root.joinpath(*relative.split("/"))
-            target.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(source, target)
-        argv = [arg.replace("{spec_dir}", str(spec_dir)).replace("{work_dir}", str(root))
-                for arg in spec["argv"]]
-        with tempfile.TemporaryFile() as out, tempfile.TemporaryFile() as err:
+    supervision_error = None
+    try:
+        with _work_directory() as directory:
+            root = Path(directory).resolve()
+            report["workdir"] = str(root)
+            identities = []
+            for source, relative in sources:
+                fingerprint, identity = _stage_input(source, root.joinpath(*relative.split("/")))
+                report["inputs"].append({"source": str(source), "dest": relative, **fingerprint})
+                identities.append(identity)
+            argv = [arg.replace("{spec_dir}", str(spec_dir)).replace("{work_dir}", str(root))
+                    for arg in spec["argv"]]
             try:
                 argv = _executable(argv)
                 report["argv"] = argv
-                report["exit_code"], report["timed_out"] = _execute(
-                    argv, root, out, err, spec["timeout_seconds"],
-                )
+                result = run_process(argv, root, spec["timeout_seconds"])
+                report.update(exit_code=result.returncode, timed_out=result.timed_out,
+                              stdout=result.stdout, stderr=result.stderr,
+                              interrupted_signal=result.interrupted_signal)
+                report["output_truncated"] = result.truncated
+                report["output_incomplete"] = result.incomplete
+                supervision_error = result.error
             except OSError as exc:
                 report["error"] = f"cannot start command: {exc}"
                 checks.append(_check("spawn", False, "command starts", str(exc)))
-            report["stdout"], out_truncated = _capture(out)
-            report["stderr"], err_truncated = _capture(err)
-        report["output_truncated"] = {"stdout": out_truncated, "stderr": err_truncated}
-        checks.append(_check("timeout", not report["timed_out"], spec["timeout_seconds"], report["timed_out"]))
-        checks.append(_check("exit_code", report["exit_code"] == spec["expect"]["exit_code"],
-                             spec["expect"]["exit_code"], report["exit_code"]))
-        checks.append(_check("output_capture", not (out_truncated or err_truncated),
-                             f"at most {CAPTURE_LIMIT} bytes per stream", report["output_truncated"]))
-        for stream in ("stdout", "stderr"):
-            key = f"{stream}_regex"
-            if key in spec["expect"]:
-                pattern = spec["expect"][key]
-                matched = re.search(pattern, report[stream]) is not None
-                checks.append(_check(key, matched, pattern, {"matched": matched}))
-        for expected in spec["expect"]["files"]:
-            file_check = _file_check(root, expected)
-            checks.append(file_check)
-            if file_check["passed"]:
-                checks.extend(validate_file_content(root.joinpath(*expected["path"].split("/")), expected))
-        if destination is not None:
-            report["artifacts"] = _save_artifacts(root, spec["expect"]["files"], destination)
+                report["output_truncated"] = {"stdout": False, "stderr": False}
+            checks.append(_check("timeout", not report["timed_out"], spec["timeout_seconds"], report["timed_out"]))
+            checks.append(_check("exit_code", report["exit_code"] == spec["expect"]["exit_code"],
+                                 spec["expect"]["exit_code"], report["exit_code"]))
+            checks.append(_check("output_capture", not (any(report["output_truncated"].values()) or report.get("output_incomplete")),
+                                 f"complete output, at most {CAPTURE_LIMIT} bytes per stream", report["output_truncated"]))
+            if not report["interrupted_signal"]:
+                assertions, report["verification_complete"] = _verify(spec, root, report, identities)
+                checks.extend(assertions)
+            if destination is not None:
+                report["artifacts"] = _save_artifacts(root, spec["expect"]["files"], destination, identities)
+    except OSError as exc:
+        supervision_error = f"file handling or cleanup failed: {exc}"
     report["duration_seconds"] = round(time.monotonic() - started, 6)
     report["status"] = "passed" if all(check["passed"] for check in checks) else "failed"
+    if supervision_error:
+        report.update(status="error", error=supervision_error)
+    if report["interrupted_signal"]:
+        report.update(status="interrupted", error="command or verification interrupted")
     return report

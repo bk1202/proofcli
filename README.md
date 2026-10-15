@@ -1,146 +1,138 @@
 # ProofCLI
 
-Acceptance checks for commands that produce files.
+**Check the files a command actually produced, beyond exit code 0.**
 
-A command can exit 0, print “done,” and still write the wrong result. ProofCLI runs it against a declarative JSON contract: stage known inputs in a fresh working directory, check the exit code and logs, inspect output contents, and keep a report and artifacts when requested.
+ProofCLI runs a trusted command in a fresh directory, stages declared fixtures, checks its logs and output contents, and returns an exit code plus a human or JSON report. Use it for small acceptance contracts around exporters, generators, data transforms, and agent workflows.
 
-Use it as a small CI acceptance gate for exporters, data transforms, generators, and agent-produced artifacts. A pass means the declared assertions passed. Choosing assertions that establish the promised result remains your responsibility.
+Python 3.10+ · Windows 10/11 and macOS · MIT · **No runtime dependencies**
 
-Python 3.10+ · Windows 10/11 and macOS · Standard-library-only runtime · MIT
+## Install
 
-## Quickstart
+Use a virtual environment with an existing Python installation. Releases contain a universal wheel, source distribution, and SHA-256 checksums. This is not a standalone executable.
 
-```console
-git clone https://github.com/bk1202/proofcli.git
-cd proofcli
-python -m pip install .
-proofcli validate examples/export/good.json
-proofcli run examples/export/good.json --artifacts evidence-good --report good-report.json
-proofcli run examples/export/false-success.json --artifacts evidence-broken --report broken-report.json
+Windows (PowerShell):
+
+```powershell
+py -3 -m venv .venv
+.venv\Scripts\python -m pip install https://github.com/bk1202/proofcli/releases/download/v0.3.0/proofcli-0.3.0-py3-none-any.whl
+.venv\Scripts\proofcli --help
 ```
 
-The first export passes: it reads a three-row CSV fixture and writes a JSON summary plus normalized CSV. The broken export deliberately drops every record while printing success and exiting 0. Its files are valid and nonempty, so presence and size checks pass. ProofCLI returns **1** because the JSON summary and CSV row count violate the contract. The retained broken files make the failure inspectable.
+macOS:
 
-Artifact directories must be new; choose a new name before repeating these commands. Report files are replaced when you explicitly reuse their paths. The spec and staged input sources are protected from report replacement.
+```sh
+python3 -m venv .venv
+.venv/bin/python -m pip install https://github.com/bk1202/proofcli/releases/download/v0.3.0/proofcli-0.3.0-py3-none-any.whl
+.venv/bin/proofcli --help
+```
 
-You can also install with `python -m pip install git+https://github.com/bk1202/proofcli.git` when Git is installed. On macOS, use `python3` if that is your Python executable. `python -m proofcli` works in place of `proofcli`.
+Use the environment's `python -m proofcli` if the console command is not on PATH. From a checkout, use `python -m pip install .`. A versioned Git installation is also available: `python -m pip install git+https://github.com/bk1202/proofcli.git@v0.3.0` (requires Git). This project is not published to PyPI.
 
-## Commands
+## First contract
+
+The examples below assume the environment's executables are on PATH; otherwise use their full paths as above.
 
 ```console
 proofcli init proofcli.json
 proofcli validate proofcli.json
-proofcli run proofcli.json
-proofcli run proofcli.json --json
-proofcli run proofcli.json --artifacts evidence --report report.json
+proofcli run proofcli.json --report verification.json --artifacts evidence
 ```
 
-- `init PATH` writes a working starter spec. It refuses to replace an existing file unless you add `--force`.
-- `validate SPEC` checks the spec without executing the command. It does not establish that its executable or input files are available, or that its assertions will pass.
-- `run SPEC` executes the command and checks its results.
-- `--json` emits one JSON report on stdout, including captured child logs.
-- `--report PATH` saves the complete JSON report, whether stdout uses human or JSON format.
-- `--artifacts DIR` copies declared output files into a new directory, preserving relative paths. It also keeps files whose content assertions failed, provided they are regular files inside the work directory.
+`init` writes a working example without executing it. `validate` checks the schema, not dependency availability. `run` executes and verifies. The legacy `proofcli SPEC` form still works.
 
-The original `proofcli SPEC` form still runs a spec. `--version` and `--help` are available.
+Artifact directories must be new. Reports are replaced atomically when explicitly reused; the spec, input sources, and retained output paths are protected. Failed files are preserved with `--artifacts`. `--json` emits one JSON object on stdout; child logs stay inside its fields.
 
-## A useful output contract
+## A failure exit codes miss
 
-The runnable [export example](examples/export/good.json) uses this shape:
+Clone this repository to try the [real CSV exporter](examples/export/export.py). After installation:
+
+```console
+proofcli run examples/export/good.json
+proofcli run examples/export/wrong-value.json --report bad-report.json --artifacts bad-output
+```
+
+Both exporter commands exit 0 and create valid, nonempty JSON and CSV. The second silently changes Grace's amount to `999.00` while keeping the original total. Its old success message, row-count check, and JSON summary check still pass. Exact record assertions fail and ProofCLI returns 1. Diagnostics identify `$/rows/1/amount`, with expected and actual values.
+
+Other runnable regressions cover [missing records with a lying summary](examples/export/missing-record.json), [unexpected CSV columns](examples/export/extra-column.json), and [no records](examples/export/false-success.json). These use the real exporter and fixture, not mocked subprocesses.
+
+## Contract shape
 
 ```json
 {
   "version": 1,
-  "name": "CSV export acceptance check",
   "argv": ["{python}", "{spec_dir}/export.py", "input.csv", "report.json"],
   "inputs": [{"source": "fixtures/input.csv", "dest": "input.csv"}],
-  "timeout_seconds": 5,
+  "timeout_seconds": 10,
+  "verification_timeout_seconds": 5,
   "expect": {
     "exit_code": 0,
-    "stdout_regex": "Export complete",
-    "files": [
-      {
-        "path": "report.json",
-        "min_size": 1,
-        "json_contains": {
-          "currency": "CAD",
-          "summary": {"row_count": 3, "total": "33.75"}
-        }
-      },
-      {
-        "path": "report.csv",
-        "min_size": 1,
-        "csv": {"columns": ["id", "customer", "amount"], "min_rows": 3}
+    "files": [{
+      "path": "report.csv",
+      "csv": {
+        "columns": ["id", "customer", "amount"],
+        "exact_columns": true,
+        "rows": [
+          {"id": "1", "customer": "Ada", "amount": "12.50"},
+          {"id": "2", "customer": "Grace", "amount": "8.25"},
+          {"id": "3", "customer": "Linus", "amount": "13.00"}
+        ]
       }
-    ]
+    }]
   }
 }
 ```
 
-The fixture is copied from beside the spec into the work directory before execution. `{spec_dir}` locates the exporter without relying on the caller's current directory. The deliberately [broken spec](examples/export/false-success.json) runs the same exporter with `--broken`.
+Assertions include expected exit code, stdout/stderr regex, regular file existence/minimum size, file-text regex, JSON object subsets (`json_contains`), exact JSON values (`json_equals`), and CSV headers/counts/exact ordered records. CSV values are strings. JSON booleans do not equal numbers; output decimals are compared without binary float rounding.
 
-| Field | Contract |
+`argv` has **no implicit shell**, variable expansion, pipes, or globbing. `{python}` selects ProofCLI's interpreter, preserving its virtual environment. `{spec_dir}` and `{work_dir}` expand inside arguments. Windows batch files are rejected; invoke an interpreter explicitly when shell behavior is intentional.
+
+See the [complete specification](docs/specification.md), [report format](docs/reports.md), and [use cases](docs/use-cases.md).
+
+## Exit codes and CI
+
+| Exit | Meaning |
 | --- | --- |
-| `version` | Required integer `1`. |
-| `name` | Optional nonempty report name. |
-| `argv` | Required nonempty array of strings; no implicit shell. |
-| `inputs` | Optional array of `{"source": "...", "dest": "..."}` file copies. Source is relative to the spec directory; destination is relative to the work directory. |
-| `timeout_seconds` | Finite number greater than `0` and at most `86400`; default `10`. |
-| `expect.exit_code` | Expected integer child exit code; default `0`. |
-| `expect.stdout_regex`, `expect.stderr_regex` | Optional nonempty Python regular expressions, matched with `re.search`. |
-| `expect.files[].path` | Relative path of a required regular output file. |
-| `expect.files[].min_size` | Inclusive minimum size in bytes; default `0`. |
-| `expect.files[].text_regex` | Python regular expression over UTF-8 file text. |
-| `expect.files[].json_contains` | Expected JSON object subset, including nested objects. Extra object keys are allowed. Arrays match exactly; booleans are distinct from numbers. |
-| `expect.files[].csv.columns` | Required CSV header names. Extra columns are allowed. |
-| `expect.files[].csv.min_rows` | Minimum number of data rows, excluding the header. |
+| `0` | Every requested assertion completed and passed, or `init`/`validate` succeeded. |
+| `1` | Command/expectation failure, timeout, output overflow, or assertion deadline exceeded. |
+| `2` | Invalid usage/spec, supervision, file handling, or report I/O error. |
+| `130` | Ctrl+C/SIGINT or Windows Ctrl+Break. |
+| `143` | SIGTERM interruption. |
 
-Specs are UTF-8 JSON; a UTF-8 BOM is accepted. Unknown fields, duplicate JSON keys, invalid types, and nonfinite numbers are rejected. At least one log regex or output-file assertion is required in addition to the exit code.
+The child's actual exit code is separate; on POSIX a negative code indicates a signal. Check `status` and `verification_complete` before treating a report as evidence. Use your CI system's artifact mechanism to upload retained files/reports.
 
-Paths in `inputs` and `expect.files` use forward slashes and must be portable relative paths without traversal. Input sources must resolve to regular files inside the spec directory, including through symlinks. Input destinations cannot also be expected output paths. Duplicate destinations and output paths are rejected, ignoring case.
+## Guarantees and limits
 
-Regexes have no implicit flags. Use inline flags such as `(?m)` when needed, and escape backslashes in JSON. For print output across Windows and macOS, `"done\\r?\\n"` accepts CRLF and LF. CSV checks reject duplicate headers and ragged rows. JSON checks reject malformed JSON, duplicate keys, and nonfinite numbers.
+- Fresh directories prevent previous-run output from satisfying checks. Inputs are independent copies with byte counts/SHA-256 fingerprints. Output links/reparse points and hard-link aliases of staged inputs are rejected.
+- Each stream is bounded to 1 MiB in memory; overflow stops the command. Logs are not first written to unbounded temporary files. Specs and semantic file reads are also capped at 1 MiB.
+- Assertions run in a separate supervised process with an independent deadline. A pathological regex cannot indefinitely block the CLI.
+- Ordinary descendants are terminated on completion, timeout, and handled interruption: Job Objects on Windows, process groups on macOS. POSIX children that detach into another session can escape. SIGKILL, crashes, native uninterruptible I/O, and external filesystem races are not universally controllable.
+- **This is not a security sandbox.** Commands inherit your environment and user permissions. They can access other files/network, modify external state, and create arbitrarily large output files. There are no general CPU, memory, network, or disk quotas. Reports may contain sensitive argv and logs.
+- A pass proves only the declared properties of observed files and decoded logs. Weak assertions, unrepresentative fixtures, or an agent changing both code and expectations can still give false confidence. No visual, audio, business, or universal semantic correctness is established.
 
-## Execution and evidence
+See the [adversarial audit and unresolved limits](docs/audit-0.3.md). This project has not had an independent third-party security review; green CI is not a blanket production-readiness claim.
 
-Every run starts with a fresh temporary work directory. Only declared inputs are staged there. The command receives no interactive stdin. It inherits the environment.
+## Why not pytest or a shell script?
 
-Use an absolute executable or a name on `PATH`. The exact first token `{python}` selects ProofCLI's Python interpreter. `{spec_dir}` and `{work_dir}` in arguments expand to their absolute directories. There is no variable expansion, globbing, or pipe/redirection interpretation. Windows `.bat` and `.cmd` executables are rejected because Windows can route them through a shell.
+| Tool | Good fit | Tradeoff |
+| --- | --- | --- |
+| ProofCLI | Small, reviewable JSON contracts around real commands; consistent reports across Windows/macOS. | Limited assertion vocabulary and fixed resource policies. |
+| pytest | Arbitrary Python assertions, rich fixtures, parametrization, plugins, and complex application tests. | Python test code and a pytest dependency; subprocess ownership/reporting must be chosen or implemented. |
+| Shell scripts | Short checks with existing utilities and direct composition. | Quoting, utilities, cleanup, and reports vary across shells/platforms. |
 
-By default the work directory and generated files are deleted after verification. Its path in the report is historical. Use `--artifacts` to retain declared outputs and `--report` to save the result. Human output lists each check; JSON output keeps child stdout and stderr inside report fields.
+ProofCLI complements general testing tools. Use pytest when verification logic is complex; invoke ProofCLI from pytest, shell, or CI when a declarative contract is useful. No speed or reliability advantage over those tools is claimed.
 
-Captured logs in a report are capped at **1 MiB per stream**, decoded as UTF-8 with invalid bytes replaced. Exceeding the cap fails the run. Logs are collected in temporary files until the process ends, so the cap does not limit disk usage or stop the command early. Content checks (`text_regex`, `json_contains`, `csv`) accept files up to **1 MiB**; larger files fail those checks. Existence and size checks can inspect larger files.
-
-| ProofCLI exit code | Meaning |
-| --- | --- |
-| `0` | All run checks passed, or validation/spec creation succeeded. |
-| `1` | An assertion failed, the process could not start, or it timed out. |
-| `2` | Invalid spec, usage, or I/O error. |
-| `130` | Interrupted. |
-
-The child's exit code is separate from ProofCLI's exit code. A spec can intentionally expect a nonzero child exit.
-
-## Boundaries
-
-**Run trusted commands and trusted specs.** A clean working directory is not an operating-system sandbox. Commands retain your user's permissions and can access files outside the work directory and the network. There are no CPU, memory, or disk quotas.
-
-Commands must finish their work before exiting. On Windows 10/11, ProofCLI assigns a suspended process to a Job Object before its code runs; job setup failure prevents execution. The job terminates descendants on timeout/interruption and remaining descendants when it closes. On macOS, a new process session allows group termination on timeout/interruption; detached processes may escape. A timeout does not undo external side effects.
-
-These checks establish specific properties, not universal correctness. A declared row count can still be fabricated; a media file can have the right size but the wrong duration. Use representative fixtures and assertions tied to the real promise. Format-aware media validation, YAML, command suites, and plugins are outside this release.
-
-## Motivation and provenance
-
-CLI-Anything reports describe path operations [announcing success while producing empty geometry (#406)](https://github.com/HKUDS/CLI-Anything/issues/406) and an [accepted audio duration differing from the rendered duration (#407)](https://github.com/HKUDS/CLI-Anything/issues/407). These reports motivated result assertions; they are not claims about every version of that project. Basic file-size checks would not reliably catch either semantic failure.
-
-ProofCLI is independently implemented. No CLI-Anything code was copied.
-
-## Development
+## Develop and release
 
 ```console
-python -m pip install -e .
+python -m pip install --require-hashes -r requirements-build.txt
+python -m build --no-isolation
+python tools/verify_dist.py
+python -m pip install .
 python -m unittest discover -s tests -v
 ```
 
-Tests launch real subprocesses and inspect real files, including the export regression above. GitHub Actions installs the package and sets `PROOFCLI_TEST_INSTALLED=1` to exercise the installed command outside the source tree. The matrix covers Windows and macOS with Python 3.10 and 3.13. Check actual workflow results for platform verification; a committed workflow alone is not a completed run.
+CI exercises the installed wheel and fresh wheel/sdist installations on Windows/macOS. Build tools are hash-locked; Actions are pinned to commit IDs. [Release instructions](docs/releasing.md) describe validation, checksums, and assets.
 
-See [practical use cases](docs/use-cases.md), [contributing](CONTRIBUTING.md), and the [MIT license](LICENSE).
+See [CHANGELOG](CHANGELOG.md), [SECURITY](SECURITY.md), and [CONTRIBUTING](CONTRIBUTING.md). Licensed under [MIT](LICENSE).
+
+Motivation included CLI-Anything issues [#406](https://github.com/HKUDS/CLI-Anything/issues/406) and [#407](https://github.com/HKUDS/CLI-Anything/issues/407). ProofCLI is independently implemented; no CLI-Anything code was copied.

@@ -1,0 +1,90 @@
+{
+  "version": 1,
+  "name": "False success: wrong-value",
+  "argv": [
+    "{python}",
+    "{spec_dir}/export.py",
+    "input.csv",
+    "report.json",
+    "--fault",
+    "wrong-value"
+  ],
+  "inputs": [
+    {
+      "source": "fixtures/input.csv",
+      "dest": "input.csv"
+    }
+  ],
+  "timeout_seconds": 5,
+  "expect": {
+    "exit_code": 0,
+    "stdout_regex": "Export complete",
+    "files": [
+      {
+        "path": "report.json",
+        "min_size": 1,
+        "json_contains": {
+          "currency": "CAD",
+          "summary": {
+            "row_count": 3,
+            "total": "33.75"
+          }
+        },
+        "json_equals": {
+          "currency": "CAD",
+          "summary": {
+            "row_count": 3,
+            "total": "33.75"
+          },
+          "rows": [
+            {
+              "id": "1",
+              "customer": "Ada",
+              "amount": "12.50"
+            },
+            {
+              "id": "2",
+              "customer": "Grace",
+              "amount": "8.25"
+            },
+            {
+              "id": "3",
+              "customer": "Linus",
+              "amount": "13.00"
+            }
+          ]
+        }
+      },
+      {
+        "path": "report.csv",
+        "min_size": 1,
+        "csv": {
+          "columns": [
+            "id",
+            "customer",
+            "amount"
+          ],
+          "min_rows": 3,
+          "exact_columns": true,
+          "rows": [
+            {
+              "id": "1",
+              "customer": "Ada",
+              "amount": "12.50"
+            },
+            {
+              "id": "2",
+              "customer": "Grace",
+              "amount": "8.25"
+            },
+            {
+              "id": "3",
+              "customer": "Linus",
+              "amount": "13.00"
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

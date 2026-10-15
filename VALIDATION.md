@@ -1,13 +1,15 @@
-# Validation
+# Validation evidence — 0.3.0
 
-Validated locally on Windows with Python 3.10.6 on October 14, 2026.
+Local validation used Windows and CPython 3.10.6 on October 14, 2026.
 
-- Built the 0.2.0 Python wheel and installed it into a separate virtual environment.
-- Ran `PROOFCLI_TEST_INSTALLED=1 python -m unittest discover -s tests -v` with that environment's command on PATH: **64 tests run, 63 passed, 1 skipped** in 17.266 seconds. CLI invocations ran outside the source tree without a source PYTHONPATH. The skipped hard-link test cannot create hard links in the local sandbox; it runs on filesystems that support them.
-- Source tests also passed. Local tests use a writable workspace temporary directory because the execution sandbox prohibits atomic renames in its OS temporary directory.
-- The real export example stages a three-row CSV, produces a JSON summary and normalized CSV, and passes content checks. Its broken variant produces valid, nonempty files and exits 0, while ProofCLI returns 1 because JSON totals and CSV row counts are wrong. Failed artifacts are retained for inspection when requested.
-- Tests exercise real processes and files, including descendant timeout cleanup, separate stdout/stderr, literal shell characters, Windows batch-file rejection, fresh directories, content validation, strict schemas, input staging, saved reports, and artifact preservation. No process behavior is mocked.
+- Source suite: 87 tests run successfully, 5 explicit skips (POSIX signal/detach behavior and local link-creation restrictions).
+- Installed-wheel suite outside the source tree: 87 tests run successfully, 5 explicit skips, in 32.849 seconds. A subsequently added literal-punctuation filename regression also passed; its paired POSIX FIFO regression requires hosted validation.
+- Wheel metadata/license/entry-point checks, fresh venv installation and real execution passed. Rebuilding the sdist into a wheel and repeating installation/execution passed. The child interpreter imported the installed package and retained its virtual environment.
+- All six hash-locked build tools were checked against PyPI's version-specific advisory feed and published wheel hashes; no advisory entries were returned. This is a point-in-time feed check, not independent source/security certification. There are zero declared runtime dependencies.
+- Baseline failures were actually reproduced: numeric JSON false positive, regex hang requiring an external watchdog, and delayed termination after output overflow. The audit document distinguishes observations from source-inspection findings.
 
-The Windows/macOS, Python 3.10/3.13 GitHub Actions matrix runs the installed command and real-process tests. Check the repository's Actions page for hosted platform results. Two batch-file tests apply only to Windows and are skipped on macOS.
+The final regression inventory has 89 tests. Hosted CI runs installed-command tests on Windows/macOS with Python 3.10/3.13, two wheel/sdist installation jobs, and an advisory job. Platform-specific skips are expected; never count a skip as a pass. Refer to the candidate/release workflow results for hosted outcomes rather than extrapolating from the Windows sandbox.
 
-Passing these tests establishes the documented MVP behavior. It does not establish semantic correctness of arbitrary files or make the temporary directory a security sandbox. See the README for the contract and limits.
+Local temporary files use a writable workspace directory because the sandbox restricts atomic renames in its OS temp area. Those restrictions are not treated as a ProofCLI guarantee or a reason to weaken atomic report writing.
+
+See [the audit](docs/audit-0.3.md) for unresolved limits. Test results do not establish arbitrary semantic correctness, sandboxing, or universal production readiness.
