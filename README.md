@@ -23,9 +23,11 @@ ProofCLI tests the output of command-line tools. Give it a command and a JSON co
 
 Use it for an exporter that drops records, a generator that writes an empty file, or an automated workflow that prints “done” before producing the expected result. A passing check means the declared assertions passed. The quality of those assertions still matters.
 
-[![Watch the 30-second ProofCLI demo](https://raw.githubusercontent.com/bk1202/proofcli/main/docs/assets/demo-poster.png)](https://github.com/bk1202/proofcli/releases/download/v0.4.0/proofcli-demo-v2.mp4)
+[![Watch the 30-second ProofCLI demo](https://raw.githubusercontent.com/bk1202/proofcli/main/docs/assets/motion-cover.png)](https://github.com/bk1202/proofcli/releases/download/v0.4.1/proofcli-landscape-motion-v1.mp4)
 
-**[Watch the 30-second demo](https://github.com/bk1202/proofcli/releases/download/v0.4.0/proofcli-demo-v2.mp4)** · [Run the examples](examples/export) · [GitHub Action](#github-action)
+**[Landscape demo](https://github.com/bk1202/proofcli/releases/download/v0.4.1/proofcli-landscape-motion-v1.mp4)** · **[Vertical / Instagram](https://github.com/bk1202/proofcli/releases/download/v0.4.1/proofcli-instagram-reel-v1.mp4)** · [Terminal walkthrough](https://github.com/bk1202/proofcli/releases/download/v0.4.0/proofcli-demo-v2.mp4)
+
+The motion demos use results captured from the real exporter and ProofCLI. [Rebuild the videos](demo), [run the examples](examples/export), or [add the GitHub Action](#github-action).
 
 ## Quick start
 

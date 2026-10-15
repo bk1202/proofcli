@@ -1,23 +1,20 @@
-name: Demo video revision
+name: Motion demos
 
 on:
   push:
     branches: [main]
-    paths: ['demo/**', 'tools/capture_demo.py', '.github/workflows/demo-video.yml']
+    paths: ['demo/**', 'tools/capture_demo.py', 'tools/make_reel_audio.py', 'tools/verify_demo_media.py', '.github/workflows/demo-video.yml']
   pull_request:
-    paths: ['demo/**', 'tools/capture_demo.py', '.github/workflows/demo-video.yml']
+    paths: ['demo/**', 'tools/capture_demo.py', 'tools/make_reel_audio.py', 'tools/verify_demo_media.py', '.github/workflows/demo-video.yml']
   workflow_dispatch:
 
 permissions:
   contents: read
 
-env:
-  DEMO_FILE: proofcli-demo-v2.mp4
-
 jobs:
   render:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -30,23 +27,36 @@ jobs:
           python-version: '3.13'
       - run: python tools/capture_demo.py
       - run: git diff --exit-code -- demo/src/evidence.json
+      - run: python tools/make_reel_audio.py
       - run: npm ci
         working-directory: demo
       - run: npm audit --audit-level=high
         working-directory: demo
       - run: npm run lint
         working-directory: demo
-      - run: npm run render
+      - run: npm run reel
         working-directory: demo
-      - name: Prepare a separately checksummed video revision
-        run: |
-          python -c "import hashlib,os; from pathlib import Path; p=Path('demo/out/proofcli-demo.mp4'); target=p.with_name(os.environ['DEMO_FILE']); p.rename(target); target.with_suffix('.SHA256SUMS').write_text(hashlib.sha256(target.read_bytes()).hexdigest()+'  '+target.name+'\n')"
+      - run: npm run landscape
+        working-directory: demo
+      - run: npm run reel-cover
+        working-directory: demo
+      - run: npm run landscape-cover
+        working-directory: demo
+      - name: Decode both videos and verify dimensions, frames, duration, audio and covers
+        run: >-
+          python tools/verify_demo_media.py
+          --ffmpeg demo/node_modules/@remotion/compositor-linux-x64-gnu/ffmpeg
+          --ffprobe demo/node_modules/@remotion/compositor-linux-x64-gnu/ffprobe
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
         with:
-          name: revised-demo
+          name: motion-demos-v1
           path: |
-            demo/out/proofcli-demo-v2.mp4
-            demo/out/proofcli-demo-v2.SHA256SUMS
+            demo/out/proofcli-instagram-reel-v1.mp4
+            demo/out/proofcli-landscape-motion-v1.mp4
+            demo/out/proofcli-instagram-cover-v1.png
+            demo/out/proofcli-landscape-cover-v1.png
+            demo/out/proofcli-motion-v1.SHA256SUMS
+            demo/out/proofcli-motion-v1-verification.json
           if-no-files-found: error
           retention-days: 7
 
@@ -60,13 +70,20 @@ jobs:
     steps:
       - uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53
         with:
-          name: revised-demo
-          path: revised-demo/
+          name: motion-demos-v1
+          path: motion-demos/
       - name: Add the new cut without replacing published package assets
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release upload v0.4.0 revised-demo/*.mp4 revised-demo/*.SHA256SUMS --repo "$GITHUB_REPOSITORY"
-          gh release view v0.4.0 --repo "$GITHUB_REPOSITORY" --json body --jq .body > notes.md
-          python -c "from pathlib import Path; p=Path('notes.md'); p.write_text(p.read_text().replace('/v0.4.0/proofcli-demo.mp4','/v0.4.0/proofcli-demo-v2.mp4'))"
-          gh release edit v0.4.0 --repo "$GITHUB_REPOSITORY" --notes-file notes.md
+          gh release upload v0.4.1 motion-demos/* --repo "$GITHUB_REPOSITORY"
+          gh release view v0.4.1 --repo "$GITHUB_REPOSITORY" --json body --jq .body > notes.md
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('notes.md')
+          body = p.read_text(encoding='utf-8')
+          if 'proofcli-instagram-reel-v1.mp4' not in body:
+              body += '\n\n### 30-second motion demos\n\n[Vertical / Instagram](https://github.com/bk1202/proofcli/releases/download/v0.4.1/proofcli-instagram-reel-v1.mp4) · [Landscape](https://github.com/bk1202/proofcli/releases/download/v0.4.1/proofcli-landscape-motion-v1.mp4)\n\nBoth use results captured from the actual exporter and ProofCLI. Covers, checksums and media validation are attached separately.\n'
+              p.write_text(body, encoding='utf-8')
+          PY
+          gh release edit v0.4.1 --repo "$GITHUB_REPOSITORY" --notes-file notes.md
