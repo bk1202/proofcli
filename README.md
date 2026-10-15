@@ -1,12 +1,29 @@
+<div align="center">
+
 # ProofCLI
 
-**Check the files a command actually produced, beyond exit code 0.**
+### A command can exit successfully and still produce the wrong result.
 
-ProofCLI runs a trusted command in a fresh directory, stages declared fixtures, checks its logs and output contents, and returns an exit code plus a human or JSON report. Use it for small acceptance contracts around exporters, generators, data transforms, and agent workflows.
+Run the command. Check its files. Report what passed and what failed.
 
-Python 3.10+ · Windows 10/11 and macOS · MIT · **No runtime dependencies**
+[![CI](https://github.com/bk1202/proofcli/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/bk1202/proofcli/actions/workflows/ci.yml)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-3776AB)](https://www.python.org/downloads/)
+[![Runtime dependencies: 0](https://img.shields.io/badge/runtime_dependencies-0-2D8A56)](pyproject.toml)
+[![MIT license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
-## Install
+**Windows · macOS · JSON contracts · Human and JSON reports**
+
+[Quick start](#quick-start) · [See it fail](#see-it-fail) · [Checks](#what-you-can-check) · [Documentation](#documentation) · [Limitations](#limitations)
+
+</div>
+
+---
+
+ProofCLI tests the output of command-line tools. Give it a command and a JSON contract: the expected exit code, log patterns, output files, and their contents. It runs the command in a fresh temporary directory and returns a report and an exit code you can use in CI.
+
+Use it for an exporter that drops records, a generator that writes an empty file, or an automated workflow that prints “done” before producing the expected result. A passing check means the declared assertions passed. The quality of those assertions still matters.
+
+## Quick start
 
 Use a virtual environment with an existing Python installation. Releases contain a universal wheel, source distribution, and SHA-256 checksums. This is not a standalone executable.
 
@@ -28,7 +45,7 @@ python3 -m venv .venv
 
 Use the environment's `python -m proofcli` if the console command is not on PATH. From a checkout, use `python -m pip install .`. A versioned Git installation is also available: `python -m pip install git+https://github.com/bk1202/proofcli.git@v0.3.0` (requires Git). This project is not published to PyPI.
 
-## First contract
+### Run your first contract
 
 The examples below assume the environment's executables are on PATH; otherwise use their full paths as above.
 
@@ -42,7 +59,7 @@ proofcli run proofcli.json --report verification.json --artifacts evidence
 
 Artifact directories must be new. Reports are replaced atomically when explicitly reused; the spec, input sources, and retained output paths are protected. Failed files are preserved with `--artifacts`. `--json` emits one JSON object on stdout; child logs stay inside its fields.
 
-## A failure exit codes miss
+## See it fail
 
 Clone this repository to try the [real CSV exporter](examples/export/export.py). After installation:
 
@@ -53,9 +70,42 @@ proofcli run examples/export/wrong-value.json --report bad-report.json --artifac
 
 Both exporter commands exit 0 and create valid, nonempty JSON and CSV. The second silently changes Grace's amount to `999.00` while keeping the original total. Its old success message, row-count check, and JSON summary check still pass. Exact record assertions fail and ProofCLI returns 1. Diagnostics identify `$/rows/1/amount`, with expected and actual values.
 
-Other runnable regressions cover [missing records with a lying summary](examples/export/missing-record.json), [unexpected CSV columns](examples/export/extra-column.json), and [no records](examples/export/false-success.json). These use the real exporter and fixture, not mocked subprocesses.
+This is the mismatch recorded in the report:
 
-## Contract shape
+```json
+{
+  "path": "$/rows/1/amount",
+  "reason": "value or type differs",
+  "expected": "8.25",
+  "actual": "999.00"
+}
+```
+
+| Example | What goes wrong despite exit code `0` |
+| --- | --- |
+| [Wrong field value](examples/export/wrong-value.json) | A record disagrees with the expected amount. |
+| [Missing record](examples/export/missing-record.json) | A record is dropped while the summary still claims three. |
+| [Unexpected column](examples/export/extra-column.json) | The CSV contains a column the contract forbids. |
+| [Empty export](examples/export/false-success.json) | The exporter reports success without the required records. |
+
+These examples execute the exporter against a checked-in CSV fixture. `--report` saves the checks and logs; `--artifacts` keeps the files for inspection.
+
+## What you can check
+
+| Check | Contract option |
+| --- | --- |
+| Exit code and execution deadline | `expect.exit_code`, `timeout_seconds` |
+| Patterns in stdout and stderr | `stdout_regex`, `stderr_regex` |
+| Regular output files and minimum byte size | `files[].path`, `min_size` |
+| Patterns in file text | `text_regex` |
+| Selected JSON fields | `json_contains` |
+| Exact JSON values, keys, and ordered arrays | `json_equals` |
+| CSV columns and minimum row count | `csv.columns`, `csv.min_rows` |
+| Exact CSV headers and ordered records | `csv.exact_columns`, `csv.rows` |
+
+### A contract
+
+This example stages a fixture, runs the exporter, and checks every CSV record:
 
 ```json
 {
@@ -82,7 +132,7 @@ Other runnable regressions cover [missing records with a lying summary](examples
 }
 ```
 
-Assertions include expected exit code, stdout/stderr regex, regular file existence/minimum size, file-text regex, JSON object subsets (`json_contains`), exact JSON values (`json_equals`), and CSV headers/counts/exact ordered records. CSV values are strings. JSON booleans do not equal numbers; output decimals are compared without binary float rounding.
+Save it beside `examples/export/export.py`, or start with the [complete good contract](examples/export/good.json). Specs use JSON; YAML is not supported. CSV values are strings. JSON booleans do not equal numbers; output decimals are compared without binary float rounding.
 
 `argv` has **no implicit shell**, variable expansion, pipes, or globbing. `{python}` selects ProofCLI's interpreter, preserving its virtual environment. `{spec_dir}` and `{work_dir}` expand inside arguments. Windows batch files are rejected; invoke an interpreter explicitly when shell behavior is intentional.
 
@@ -100,7 +150,7 @@ See the [complete specification](docs/specification.md), [report format](docs/re
 
 The child's actual exit code is separate; on POSIX a negative code indicates a signal. Check `status` and `verification_complete` before treating a report as evidence. Use your CI system's artifact mechanism to upload retained files/reports.
 
-## Guarantees and limits
+## Limitations
 
 - Fresh directories prevent previous-run output from satisfying checks. Inputs are independent copies with byte counts/SHA-256 fingerprints. Output links/reparse points and hard-link aliases of staged inputs are rejected.
 - Each stream is bounded to 1 MiB in memory; overflow stops the command. Logs are not first written to unbounded temporary files. Specs and semantic file reads are also capped at 1 MiB.
@@ -109,7 +159,7 @@ The child's actual exit code is separate; on POSIX a negative code indicates a s
 - **This is not a security sandbox.** Commands inherit your environment and user permissions. They can access other files/network, modify external state, and create arbitrarily large output files. There are no general CPU, memory, network, or disk quotas. Reports may contain sensitive argv and logs.
 - A pass proves only the declared properties of observed files and decoded logs. Weak assertions, unrepresentative fixtures, or an agent changing both code and expectations can still give false confidence. No visual, audio, business, or universal semantic correctness is established.
 
-See the [adversarial audit and unresolved limits](docs/audit-0.3.md). This project has not had an independent third-party security review; green CI is not a blanket production-readiness claim.
+See the [audit](docs/audit-0.3.md) for confirmed defects and remaining limits, and [validation evidence](VALIDATION.md) for actual test results and skipped cases. The project has not had an independent third-party security review.
 
 ## Why not pytest or a shell script?
 
@@ -119,9 +169,22 @@ See the [adversarial audit and unresolved limits](docs/audit-0.3.md). This proje
 | pytest | Arbitrary Python assertions, rich fixtures, parametrization, plugins, and complex application tests. | Python test code and a pytest dependency; subprocess ownership/reporting must be chosen or implemented. |
 | Shell scripts | Short checks with existing utilities and direct composition. | Quoting, utilities, cleanup, and reports vary across shells/platforms. |
 
-ProofCLI complements general testing tools. Use pytest when verification logic is complex; invoke ProofCLI from pytest, shell, or CI when a declarative contract is useful. No speed or reliability advantage over those tools is claimed.
+ProofCLI can run inside pytest, a shell script, or CI. Choose a general test framework when the verification logic outgrows a declarative contract.
 
-## Develop and release
+## Documentation
+
+| Guide | Contents |
+| --- | --- |
+| [Specification](docs/specification.md) | Every contract field, path rule, placeholder, and resource limit. |
+| [Reports](docs/reports.md) | Statuses, diagnostics, interruption handling, and exit codes. |
+| [Use cases](docs/use-cases.md) | Choosing checks for exporters, generators, and workflows. |
+| [Audit](docs/audit-0.3.md) | Defects found, regression coverage, and unresolved risks. |
+| [Releases](docs/releasing.md) | Build, validation, checksums, and publication. |
+| [Changelog](CHANGELOG.md) | Version history and compatibility changes. |
+
+## Contributing
+
+Bug reports should include a minimal contract, the expected result, and the actual report. Use a small reproducer that can be shared safely. See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and checks, and [SECURITY.md](SECURITY.md) for security reports.
 
 ```console
 python -m pip install --require-hashes -r requirements-build.txt

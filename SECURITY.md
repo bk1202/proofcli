@@ -6,7 +6,7 @@ Capture/read limits, assertion deadlines, process cleanup, and fresh directories
 
 Reports are unsigned and can contain sensitive argv/paths/logs. Do not publish them blindly.
 
-There are no runtime dependencies. Build tools are pinned with universal-wheel hashes. `tools/audit_dependencies.py` checks their versions/hashes against PyPI's advisory feed and fails on unavailable metadata or advisories. This point-in-time feed check is not a comprehensive source audit. CI pins action commits, uses read-only permissions and no persisted checkout credentials, and avoids privileged PR triggers. Only release upload gets repository write permission. No PyPI credentials/publication are configured.
+There are no runtime dependencies. Build tools are pinned with universal-wheel hashes. `tools/audit_dependencies.py` checks their versions/hashes against PyPI's advisory feed and fails on unavailable metadata or advisories. This point-in-time feed check is not a comprehensive source audit. CI pins action commits, uses read-only permissions and no persisted checkout credentials, and avoids privileged PR triggers. Only release publication gets repository write permission. No PyPI credentials/publication are configured.
 
 Use **Security → Report a vulnerability** on GitHub when available. If private reporting is unavailable, open an issue requesting a private channel without disclosing exploit details or secrets. No private email or guaranteed response time is advertised.
 

@@ -12,6 +12,8 @@ The final regression inventory has 89 tests. Hosted CI runs installed-command te
 
 The initial hosted candidate (`9aebb7e`) passed all four runtime-test jobs and the advisory job. Both distribution gates caught a checker bug comparing canonical extraction targets with noncanonical temporary roots (macOS `/var` and Windows 8.3 aliases). That check was fixed rather than disabled; packaging and release remain gated on the corrected candidate's results.
 
+The corrected candidate (`569cbad`) passed [all seven hosted gates](https://github.com/bk1202/proofcli/actions/runs/38695358037): four runtime jobs, two distribution jobs, and the advisory check. Observed runtime summaries: Windows ran 89 tests with 3 platform/privilege skips; macOS ran 89 with 2 Windows-only skips. Later release-workflow changes are validated again before tagging; the release workflow also reruns the gates before publishing assets.
+
 Local temporary files use a writable workspace directory because the sandbox restricts atomic renames in its OS temp area. Those restrictions are not treated as a ProofCLI guarantee or a reason to weaken atomic report writing.
 
 See [the audit](docs/audit-0.3.md) for unresolved limits. Test results do not establish arbitrary semantic correctness, sandboxing, or universal production readiness.
