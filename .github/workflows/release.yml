@@ -14,7 +14,7 @@ jobs:
       contents: read
 
   publish:
-    needs: validate
+    needs: [validate, demo]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -34,6 +34,12 @@ jobs:
       - run: python -m pip install --require-hashes -r requirements-build.txt
       - run: python -m build --no-isolation
       - run: python tools/verify_dist.py
+      - uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53
+        with:
+          name: demo-video
+          path: dist/
+      - name: Add the demo checksum
+        run: python -c "import hashlib; from pathlib import Path; p=Path('dist/proofcli-demo.mp4'); f=Path('dist/SHA256SUMS'); f.write_text(f.read_text()+hashlib.sha256(p.read_bytes()).hexdigest()+'  '+p.name+'\n')"
       - name: Prepare release notes from the versioned changelog
         env:
           RELEASE_TAG: ${{ github.ref_name }}
@@ -42,4 +48,39 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ github.ref_name }}
-        run: gh release create "$RELEASE_TAG" dist/*.whl dist/*.tar.gz dist/SHA256SUMS --verify-tag --title "ProofCLI $RELEASE_TAG" --notes-file dist/RELEASE_NOTES.md
+        run: gh release create "$RELEASE_TAG" dist/*.whl dist/*.tar.gz dist/*.mp4 dist/SHA256SUMS --verify-tag --title "ProofCLI $RELEASE_TAG" --notes-file dist/RELEASE_NOTES.md
+
+  demo:
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.13'
+      - name: Capture actual exporter and CLI results
+        run: python tools/capture_demo.py
+      - name: Install locked demo build tools
+        working-directory: demo
+        run: npm ci
+      - name: Check demo dependencies
+        working-directory: demo
+        run: npm audit --audit-level=high
+      - name: Type-check the composition
+        working-directory: demo
+        run: npm run lint
+      - name: Render the 30-second walkthrough
+        working-directory: demo
+        run: npm run render
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
+        with:
+          name: demo-video
+          path: demo/out/proofcli-demo.mp4
+          if-no-files-found: error
+          retention-days: 7

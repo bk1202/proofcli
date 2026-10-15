@@ -1,0 +1,26 @@
+{
+  "name": "proofcli-demo",
+  "version": "1.0.0",
+  "description": "A 30-second demo driven by actual exporter and ProofCLI results",
+  "repository": "https://github.com/bk1202/proofcli",
+  "license": "MIT",
+  "private": true,
+  "dependencies": {
+    "@remotion/cli": "4.0.535",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "remotion": "4.0.535"
+  },
+  "devDependencies": {
+    "@types/react": "19.2.7",
+    "typescript": "5.9.3"
+  },
+  "scripts": {
+    "dev": "remotion studio",
+    "build": "remotion bundle",
+    "upgrade": "remotion upgrade",
+    "lint": "tsc --noEmit",
+    "render": "remotion render src/index.ts ProofCLI out/proofcli-demo.mp4 --codec=h264 --crf=20 --concurrency=2",
+    "poster": "remotion still src/index.ts ProofCLI out/demo-poster.png --frame=540 --scale=0.5"
+  }
+}

@@ -86,7 +86,8 @@ def main():
                     with archive.extractfile(member) as reader, target.open("xb") as writer:
                         shutil.copyfileobj(reader, writer)
         source = next(unpacked.iterdir())
-        for required in ("CHANGELOG.md", "SECURITY.md", "examples/export/fixtures/input.csv", "tools/verify_dist.py", "tools/prepare_release.py"):
+        for required in ("CHANGELOG.md", "SECURITY.md", "examples/export/fixtures/input.csv", "tools/verify_dist.py", "tools/prepare_release.py",
+                         "action.yml", ".github/proofcli_action.py", "tools/fetch_release.py", "demo/package-lock.json", "demo/src/evidence.json"):
             assert (source / required).is_file(), f"sdist missing {required}"
         rebuilt = root / "rebuilt"
         run([sys.executable, "-m", "build", "--wheel", "--no-isolation", "--outdir", rebuilt, source], root)

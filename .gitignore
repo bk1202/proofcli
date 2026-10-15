@@ -13,3 +13,5 @@ Thumbs.db
 .proofcli/
 evidence-*/
 *-report.json
+demo/node_modules/
+demo/out/

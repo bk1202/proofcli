@@ -17,7 +17,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, macos-latest]
+        os: [windows-latest, macos-latest, ubuntu-latest]
         python: ['3.10', '3.13']
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -69,3 +69,56 @@ jobs:
         with:
           python-version: '3.13'
       - run: python tools/audit_dependencies.py
+
+  action:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: ./
+        id: good
+        with:
+          spec: examples/export/good.json
+      - uses: ./
+        id: wrong
+        continue-on-error: true
+        with:
+          spec: examples/export/wrong-value.json
+      - name: Confirm the action fails for the broken export
+        shell: bash
+        env:
+          OUTCOME: ${{ steps.wrong.outcome }}
+          STATUS: ${{ steps.wrong.outputs.status }}
+          EXIT_CODE: ${{ steps.wrong.outputs.exit-code }}
+          REPORT: ${{ steps.wrong.outputs.report }}
+        run: |
+          python -c "import json,os; from pathlib import Path; assert os.environ['OUTCOME']=='failure'; assert os.environ['STATUS']=='failed'; assert os.environ['EXIT_CODE']=='1'; report=json.loads(Path(os.environ['REPORT']).read_text()); assert report['exit_code']==0; assert report['verification_complete']"
+
+  demo-source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.13'
+      - run: python tools/capture_demo.py
+      - name: Confirm the published demo evidence matches current behavior
+        run: git diff --exit-code -- demo/src/evidence.json
+      - run: npm ci
+        working-directory: demo
+      - run: npm audit --audit-level=high
+        working-directory: demo
+      - run: npm run lint
+        working-directory: demo

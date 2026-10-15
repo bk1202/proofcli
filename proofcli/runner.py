@@ -150,7 +150,8 @@ def _verify(spec, root, report, identities):
         payload = Path(directory) / "input.json"
         output = Path(directory) / "checks.json"
         payload.write_text(json.dumps({"spec": spec, "root": str(root), "stdout": report["stdout"],
-                                       "stderr": report["stderr"], "input_identities": identities}), encoding="utf-8")
+                                       "stderr": report["stderr"], "encoding_errors": report.get("output_encoding_errors", {}),
+                                       "input_identities": identities}), encoding="utf-8")
         env = os.environ.copy()
         env["PYTHONPATH"] = str(Path(__file__).resolve().parent.parent) + os.pathsep + env.get("PYTHONPATH", "")
         result = run_process([sys.executable, "-m", "proofcli._verify", str(payload), str(output)],
@@ -209,6 +210,8 @@ def run_spec(spec, *, spec_dir=None, artifacts_dir=None):
                               interrupted_signal=result.interrupted_signal)
                 report["output_truncated"] = result.truncated
                 report["output_incomplete"] = result.incomplete
+                report["output_encoding_errors"] = result.encoding_errors
+                report["output_bytes_base64"] = result.bytes_base64
                 supervision_error = result.error
             except OSError as exc:
                 report["error"] = f"cannot start command: {exc}"
@@ -217,8 +220,11 @@ def run_spec(spec, *, spec_dir=None, artifacts_dir=None):
             checks.append(_check("timeout", not report["timed_out"], spec["timeout_seconds"], report["timed_out"]))
             checks.append(_check("exit_code", report["exit_code"] == spec["expect"]["exit_code"],
                                  spec["expect"]["exit_code"], report["exit_code"]))
-            checks.append(_check("output_capture", not (any(report["output_truncated"].values()) or report.get("output_incomplete")),
-                                 f"complete output, at most {CAPTURE_LIMIT} bytes per stream", report["output_truncated"]))
+            checks.append(_check("output_capture", not (any(report["output_truncated"].values())
+                                 or report.get("output_incomplete") or report.get("output_encoding_errors")),
+                                 f"complete UTF-8 output, at most {CAPTURE_LIMIT} bytes per stream",
+                                 {"truncated": report["output_truncated"], "incomplete": report.get("output_incomplete", False),
+                                  "encoding_errors": report.get("output_encoding_errors", {})}))
             if not report["interrupted_signal"]:
                 assertions, report["verification_complete"] = _verify(spec, root, report, identities)
                 checks.extend(assertions)

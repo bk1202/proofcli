@@ -1,5 +1,15 @@
 # Validation evidence — 0.3.0
 
+## 0.4.0 follow-up
+
+The invalid-byte false positive was reproduced against 0.3.0: a command writing `FF` passed a replacement-character regex. New real-process regressions cover invalid stdout/stderr, byte recovery, correctly encoded replacement characters, split multibyte output, and interruption draining. The Action entry point is executed with passing, failing, malformed, and protected-report contracts.
+
+Local Windows validation ran 94 tests successfully with 7 explicit platform/filesystem skips before the final Action report-error regression was added. Wheel installation and source rebuild/installation passed. The final inventory is 95 tests; final platform outcomes are recorded by the linked candidate/release workflows, not inferred from this inventory.
+
+The demo's rendered MP4 was inspected at each scene and probed: H.264, 1920×1080, 900 frames, 30.000 seconds. Its messages and mismatch values come from an actual exporter subprocess and an actual CLI subprocess. The locked demo dependency audit returned zero advisory entries after unused scaffold lint dependencies were removed. A real download of the 0.3.0 release exercised the new PyPI transfer verifier against its exact tag commit and package checksums.
+
+## 0.3.0 release
+
 Local validation used Windows and CPython 3.10.6 on October 14, 2026.
 
 - Source suite: 87 tests run successfully, 5 explicit skips (POSIX signal/detach behavior and local link-creation restrictions).

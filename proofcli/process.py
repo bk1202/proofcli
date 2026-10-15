@@ -1,6 +1,7 @@
 """Bounded process I/O and ownership of ordinary descendants; no reader threads."""
 
 from dataclasses import dataclass, field
+import base64
 import os
 import signal
 import subprocess
@@ -23,6 +24,8 @@ class Result:
     interrupted_signal: int | None = None
     truncated: dict = field(default_factory=lambda: {"stdout": False, "stderr": False})
     incomplete: bool = False
+    encoding_errors: dict = field(default_factory=dict)
+    bytes_base64: dict = field(default_factory=dict)
     error: str | None = None
 
 
@@ -69,6 +72,30 @@ def run_process(argv, cwd, timeout, *, env=None):
     pipes = {}
     started = time.monotonic()
     cleaned = False
+    def collect_available():
+        progressed = False
+        for name, pipe in list(pipes.items()):
+            data = _read(pipe)
+            if data is None:
+                continue
+            progressed = True
+            if not data:
+                pipe.close()
+                del pipes[name]
+                continue
+            room = CAPTURE_LIMIT - len(buffers[name])
+            buffers[name].extend(data[:room])
+            if len(data) > room:
+                result.truncated[name] = True
+        return progressed
+
+    def drain():
+        deadline = time.monotonic() + 0.5
+        while pipes and time.monotonic() < deadline:
+            if not collect_available():
+                time.sleep(0.005)
+        result.incomplete = bool(pipes)
+
     try:
         if os.name == "nt":
             from .winjob import WindowsJob
@@ -88,20 +115,7 @@ def run_process(argv, cwd, timeout, *, env=None):
                 os.set_blocking(pipe.fileno(), False)
         draining_until = None
         while True:
-            progressed = False
-            for name, pipe in list(pipes.items()):
-                data = _read(pipe)
-                if data is None:
-                    continue
-                progressed = True
-                if not data:
-                    pipe.close()
-                    del pipes[name]
-                    continue
-                room = CAPTURE_LIMIT - len(buffers[name])
-                buffers[name].extend(data[:room])
-                if len(data) > room:
-                    result.truncated[name] = True
+            progressed = collect_available()
             now = time.monotonic()
             if not cleaned:
                 result.timed_out = process.poll() is None and now - started >= timeout
@@ -127,9 +141,13 @@ def run_process(argv, cwd, timeout, *, env=None):
             try:
                 if not cleaned:
                     _terminate(process, job)
+                    # An interrupt may arrive after the child wrote to a pipe
+                    # but before the next polling iteration collected it.
+                    drain()
                 result.returncode = process.returncode
             except (OSError, subprocess.TimeoutExpired) as exc:
                 result.error = f"process cleanup failed: {exc}"
+                result.incomplete = bool(pipes)
             finally:
                 for pipe in (process.stdout, process.stderr):
                     if pipe is not None:
@@ -139,6 +157,13 @@ def run_process(argv, cwd, timeout, *, env=None):
                 job.close()
             except OSError as exc:
                 result.error = f"job cleanup failed: {exc}"
-    result.stdout = bytes(buffers["stdout"]).decode("utf-8", errors="replace")
-    result.stderr = bytes(buffers["stderr"]).decode("utf-8", errors="replace")
+    for name, buffer in buffers.items():
+        data = bytes(buffer)
+        try:
+            text = data.decode("utf-8", errors="strict")
+        except UnicodeDecodeError as exc:
+            result.encoding_errors[name] = {"start": exc.start, "end": exc.end, "reason": exc.reason}
+            result.bytes_base64[name] = base64.b64encode(data).decode("ascii")
+            text = data.decode("utf-8", errors="replace")
+        setattr(result, name, text)
     return result
