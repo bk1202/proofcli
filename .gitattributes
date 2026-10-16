@@ -5,3 +5,4 @@
 *.md text eol=lf
 *.toml text eol=lf
 *.yml text eol=lf
+*.ttf binary

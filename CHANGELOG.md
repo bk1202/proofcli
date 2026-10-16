@@ -5,6 +5,8 @@
 ### Changed
 
 - `proofcli --help` lists `run`, `validate`, and `init`, each with its own one-line description. `proofcli run --help`, `proofcli validate --help`, and `proofcli init --help` each describe that command instead of sharing one sentence. `proofcli SPEC` still runs a spec, and exit codes are unchanged.
+- GitHub releases now attach one PNG of real ProofCLI output: the failing export check and the passing run. The image is drawn with a vendored monospace font. Pillow is installed only while that release image is built, and ProofCLI itself still has no runtime dependencies. The release workflow no longer renders a demo video or installs the Remotion tools, so a video render cannot block the GitHub release or the PyPI publish that follows it. The motion-demo workflow can still render preview videos as workflow artifacts, and it no longer uploads those videos to a release.
+- Every pull request and push runs a `release-screenshot` check on Python 3.13. That job installs only the hash-locked Pillow used for the release image, runs the screenshot tests, and fails if one of those tests is skipped or missing. It also uploads the PNG as a workflow artifact.
 
 ## 0.4.2 — 2026-10-16
 

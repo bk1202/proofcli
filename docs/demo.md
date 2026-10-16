@@ -27,6 +27,6 @@ npm run poster
 
 The output is `demo/out/proofcli-demo.mp4`; the poster is `demo/out/demo-poster.png`. Dependencies are locked in `demo/package-lock.json` and are used only to build the video. The Python package and GitHub Action do not install them.
 
-`demo-video.yml` renders pull-request previews and publishes the named revision after merge to main. It refuses to replace an existing asset. Future edits must use a new revision filename and matching links instead of overwriting published bytes. This media workflow does not trigger a Python package release.
+`demo-video.yml` can still render preview videos and store them as workflow artifacts. It does not upload those videos to a GitHub release, and it does not trigger a Python package release.
 
 [The hosted demo workflow](../.github/workflows/demo.yml) intentionally has a successful ordinary job and a failed ProofCLI job. Its failed overall result is the expected demonstration. The separate validation workflow asserts that same failure and remains green only when ProofCLI rejects the broken export.
