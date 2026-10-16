@@ -5,6 +5,7 @@
 ### Changed
 
 - `proofcli --help` lists `run`, `validate`, and `init`, each with its own one-line description. `proofcli run --help`, `proofcli validate --help`, and `proofcli init --help` each describe that command instead of sharing one sentence. `proofcli SPEC` still runs a spec, and exit codes are unchanged.
+- GitHub releases now attach one PNG of real ProofCLI output: the failing export check and the passing run. The release workflow no longer renders a demo video or installs the Remotion tools, so a video render cannot block the GitHub release or the PyPI publish that follows it. The motion-demo workflow can still render preview videos as workflow artifacts, and it no longer uploads those videos to a release.
 
 ## 0.4.2 — 2026-10-16
 
