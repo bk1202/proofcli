@@ -124,3 +124,28 @@ jobs:
         working-directory: demo
       - run: npm run lint
         working-directory: demo
+
+  release-screenshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: '3.13'
+      - name: Install the hash-locked release-image renderer
+        run: python -m pip install --require-hashes -r tools/release-requirements.txt
+      - name: Run the screenshot tests and fail if any are skipped or missing
+        env:
+          PROOFCLI_REQUIRE_RENDER: '1'
+        run: python tests/test_release_screenshot.py
+      - name: Render the release screenshot
+        run: python tools/render_release_screenshot.py dist/proofcli-screenshot.png
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: release-screenshot
+          path: dist/proofcli-screenshot.png
+          if-no-files-found: error
+          retention-days: 7
