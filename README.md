@@ -19,15 +19,24 @@ Run the command. Check its files. Report what passed and what failed.
 
 ---
 
+![An exporter exits 0 and writes three records, but ProofCLI catches Grace's amount: expected 8.25, actual 999.00. ProofCLI exits 1.](docs/assets/output-contract.png)
+
+The [broken exporter](examples/export/export.py) prints “Export complete” and exits `0`. Its JSON and CSV contain the wrong amount. The [contract](examples/export/wrong-value.json) checks the records and fails with this difference in the actual report:
+
+```json
+{
+  "path": "$/rows/1/amount",
+  "reason": "value or type differs",
+  "expected": "8.25",
+  "actual": "999.00"
+}
+```
+
+**[Reproduce this failure](#see-it-fail)** · [Install from PyPI](#quick-start) · [Add the GitHub Action](#github-action)
+
 ProofCLI tests the output of command-line tools. Give it a command and a JSON contract: the expected exit code, log patterns, output files, and their contents. It runs the command in a fresh temporary directory and returns a report and an exit code you can use in CI.
 
 Use it for an exporter that drops records, a generator that writes an empty file, or an automated workflow that prints “done” before producing the expected result. A passing check means the declared assertions passed. The quality of those assertions still matters.
-
-[![Watch the 30-second ProofCLI demo](https://raw.githubusercontent.com/bk1202/proofcli/main/docs/assets/motion-cover.png)](https://github.com/bk1202/proofcli/releases/download/v0.4.1/proofcli-landscape-motion-v1.mp4)
-
-**[Landscape demo](https://github.com/bk1202/proofcli/releases/download/v0.4.1/proofcli-landscape-motion-v1.mp4)** · **[Vertical / Instagram](https://github.com/bk1202/proofcli/releases/download/v0.4.1/proofcli-instagram-reel-v1.mp4)** · [Terminal walkthrough](https://github.com/bk1202/proofcli/releases/download/v0.4.0/proofcli-demo-v2.mp4)
-
-The motion demos use results captured from the real exporter and ProofCLI. [Rebuild the videos](demo), [run the examples](examples/export), or [add the GitHub Action](#github-action).
 
 ## Quick start
 
@@ -67,24 +76,21 @@ Artifact directories must be new. Reports are replaced atomically when explicitl
 
 ## See it fail
 
-Clone this repository to try the [real CSV exporter](examples/export/export.py). After installation:
+With ProofCLI [installed](#quick-start), clone the repository and run the failing contract:
+
+```console
+git clone https://github.com/bk1202/proofcli.git
+cd proofcli
+proofcli run examples/export/wrong-value.json
+```
+
+**Expected outcome: ProofCLI exits `1`, while the exporter exits `0`.** The exporter creates valid, nonempty JSON and CSV, silently changing Grace's amount to `999.00` while keeping the original total. Its success message, row-count check, and JSON summary check still pass. Exact record assertions identify `$/rows/1/amount`: expected `8.25`, actual `999.00`.
+
+Run the correct exporter for comparison, or keep the failed files and report for inspection:
 
 ```console
 proofcli run examples/export/good.json
 proofcli run examples/export/wrong-value.json --report bad-report.json --artifacts bad-output
-```
-
-Both exporter commands exit 0 and create valid, nonempty JSON and CSV. The second silently changes Grace's amount to `999.00` while keeping the original total. Its old success message, row-count check, and JSON summary check still pass. Exact record assertions fail and ProofCLI returns 1. Diagnostics identify `$/rows/1/amount`, with expected and actual values.
-
-This is the mismatch recorded in the report:
-
-```json
-{
-  "path": "$/rows/1/amount",
-  "reason": "value or type differs",
-  "expected": "8.25",
-  "actual": "999.00"
-}
 ```
 
 | Example | What goes wrong despite exit code `0` |
