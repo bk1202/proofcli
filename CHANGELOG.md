@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- Human-readable output now leads with failing checks: each shows the differing JSON/CSV path, the reason, and the expected and actual values on separate lines as JSON. Passing checks collapse into a count. Child stdout/stderr and the temporary directory are still printed, as before, on passing and failing runs.
+- Errors raised before a command runs (usage errors, missing spec, existing artifact directory, existing `init` target) print the error itself instead of `ERROR: command` and `Exit: None; elapsed: 0.000s`.
+- The timeout check reads `finished in 0.071s (limit 10s)` or `timed out: exceeded the 1s limit` instead of `expected 10; actual False`.
+
+No report schema changes: `--json` and `--report` output is identical.
+
 ## 0.4.1 — 2026-10-15
 
 ### Fixed

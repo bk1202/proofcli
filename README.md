@@ -86,6 +86,24 @@ proofcli run examples/export/wrong-value.json
 
 **Expected outcome: ProofCLI exits `1`, while the exporter exits `0`.** The exporter creates valid, nonempty JSON and CSV, silently changing Grace's amount to `999.00` while keeping the original total. Its success message, row-count check, and JSON summary check still pass. Exact record assertions identify `$/rows/1/amount`: expected `8.25`, actual `999.00`.
 
+The terminal report leads with what failed:
+
+```text
+FAILED: False success: wrong-value
+  2 of 9 checks failed:
+  [FAIL] file:report.json:json_equals
+      at $/rows/1/amount: value or type differs
+        expected: "8.25"
+        actual:   "999.00"
+  [FAIL] file:report.csv:csv
+      at $/rows/1/amount: value or type differs
+        expected: "8.25"
+        actual:   "999.00"
+  7 other checks passed.
+  Command exit code: 0; elapsed: 0.069s
+  ...
+```
+
 Run the correct exporter for comparison, or keep the failed files and report for inspection:
 
 ```console
