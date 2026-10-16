@@ -25,6 +25,50 @@ def _display(value):
                    else c.encode("unicode_escape").decode("ascii") for c in str(value))
 
 
+_VALUE_LIMIT = 300
+
+
+def _value(value):
+    """Compact JSON rendering for terminal output, escaped and bounded."""
+    text = json.dumps(value, ensure_ascii=True, default=str, separators=(", ", ": "))
+    return text if len(text) <= _VALUE_LIMIT else text[:_VALUE_LIMIT] + "..."
+
+
+def _seconds(value):
+    return f"{value:g}s" if isinstance(value, (int, float)) else _value(value)
+
+
+def _check_details(check, report):
+    """Lines explaining one check; failures lead with the differing path."""
+    actual = check["actual"]
+    if check["name"] == "timeout":
+        limit = _seconds(check["expected"])
+        if actual:
+            return [f"timed out: exceeded the {limit} limit"]
+        return [f"finished in {report['duration_seconds']:.3f}s (limit {limit})"]
+    if isinstance(actual, dict):
+        if actual.get("matched") is False:
+            return [f"no match for regex {_value(check['expected'])}"]
+        if actual.get("error"):
+            return [f"error: {_display(actual['error'])}"]
+        difference = actual.get("difference")
+        if isinstance(difference, dict):
+            lines = [f"at {_display(difference.get('path', '$'))}: {_display(difference.get('reason', 'differs'))}"]
+            for key in ("expected", "actual"):
+                if key in difference:
+                    lines.append(f"  {key + ':':<9} {_value(difference[key])}")
+            return lines
+        if actual.get("missing_columns"):
+            return [f"missing CSV columns: {_value(actual['missing_columns'])}",
+                    f"  {'actual:':<9} {_value(actual.get('columns'))}"]
+        if actual.get("column_mismatch"):
+            mismatch = actual["column_mismatch"]
+            return ["CSV columns differ",
+                    f"  {'expected:':<9} {_value(mismatch['expected'])}",
+                    f"  {'actual:':<9} {_value(mismatch['actual'])}"]
+    return [f"{'expected:':<9} {_value(check['expected'])}", f"{'actual:':<9} {_value(actual)}"]
+
+
 def _human(report):
     if report["status"] == "valid":
         return (f"VALID: {_display(report['name'])}\n  Spec: {_display(report['spec'])}\n"
@@ -32,17 +76,36 @@ def _human(report):
     if report["status"] == "created":
         return (f"Created spec: {_display(report['path'])}\n"
                 f"  Next: proofcli run \"{_display(report['path'])}\"")
+    executed = bool(report.get("argv")) or report.get("exit_code") is not None or bool(report["checks"])
+    if not executed:
+        # Nothing ran: no command name, exit code or elapsed time to show.
+        if report["status"] == "interrupted":
+            return "INTERRUPTED: no command was executed."
+        return (f"ERROR: {_display(report.get('error') or 'unknown error')}\n"
+                "  No command was executed.")
     lines = [f"{report['status'].upper()}: {_display(report['name'])}"]
     if report.get("error"):
         lines.append(f"  Error: {_display(report['error'])}")
-    for check in report["checks"]:
-        marker = "PASS" if check["passed"] else "FAIL"
-        lines.append(f"  [{marker}] {_display(check['name'])}: expected {check['expected']!r}; actual {check['actual']!r}")
-    lines.append(f"  Exit: {report['exit_code']}; elapsed: {report['duration_seconds']:.3f}s")
-    if report["workdir"]:
-        lines.append(f"  Temporary directory (removed): {_display(report['workdir'])}")
+    checks = report["checks"]
+    failed = [check for check in checks if not check["passed"]]
+    passed = [check for check in checks if check["passed"]]
+    if failed:
+        lines.append(f"  {len(failed)} of {len(checks)} check{'s' if len(checks) != 1 else ''} failed:")
+        for check in failed:
+            lines.append(f"  [FAIL] {_display(check['name'])}")
+            lines.extend("      " + line for line in _check_details(check, report))
+    if passed and not failed:
+        lines.append(f"  All {len(passed)} checks passed.")
+    elif passed:
+        lines.append(f"  {len(passed)} other check{'s' if len(passed) != 1 else ''} passed.")
+    lines.append(f"  Command exit code: {report['exit_code']}; elapsed: {report['duration_seconds']:.3f}s"
+                 + ("; timed out" if report.get("timed_out") else ""))
     if report.get("artifacts_dir"):
         lines.append(f"  Artifacts: {_display(report['artifacts_dir'])}")
+    # Unchanged from earlier releases, for passing runs too: the GitHub Action's
+    # job log shows this text, and its JSON report is not uploaded by default.
+    if report["workdir"]:
+        lines.append(f"  Temporary directory (removed): {_display(report['workdir'])}")
     for stream in ("stdout", "stderr"):
         if report[stream]:
             # Escape controls, including terminal escape sequences from child programs.
