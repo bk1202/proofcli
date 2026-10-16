@@ -1,0 +1,5 @@
+# Release-image only. ProofCLI declares no runtime dependencies.
+# Hashes checked against the Pillow 12.3.0 files published on PyPI.
+pillow==12.3.0 \
+    --hash=sha256:78cb2c6865a35ab8ff8b75fd122f6033b92a62c82801110e48ddd6c936a45d91 \
+    --hash=sha256:0847a763afefb695bc912d7c131e7e0632d4edc1d8698f58ddabec8e46b8b6d3
