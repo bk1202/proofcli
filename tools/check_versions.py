@@ -4,7 +4,8 @@ Checks pyproject.toml, proofcli.__version__, `pip install proofcli==X.Y.Z` pins,
 `bk1202/proofcli@vX.Y.Z` Action references, and `releases/tag/vX.Y.Z` links in
 README.md and docs/*.md. Also fails if `.github/workflows/demo-video.yml`
 hard-codes a `gh release` tag or `releases/download` tag other than the package
-version. Historical asset links in the docs and CHANGELOG entries are
+version, or if demo source hard-codes a `bk1202/proofcli@vX.Y.Z` pin that
+disagrees. Historical asset links in the docs and CHANGELOG entries are
 intentionally not checked. Zero dependencies.
 """
 
@@ -77,6 +78,21 @@ def check(root):
                         f".github/workflows/demo-video.yml:{number}: "
                         f"release tag v{match.group(1)} != pyproject {version}"
                     )
+    demo = root / "demo"
+    if demo.is_dir():
+        action_pin = PATTERNS["Action pin"]
+        for path in sorted(demo.rglob("*")):
+            if not path.is_file() or path.suffix.lower() not in {".ts", ".tsx", ".js", ".jsx", ".md"}:
+                continue
+            if "node_modules" in path.parts:
+                continue
+            for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+                for match in action_pin.finditer(line):
+                    if match.group(1) != version:
+                        problems.append(
+                            f"{path.relative_to(root).as_posix()}:{number}: "
+                            f"Action pin {match.group(1)} != pyproject {version}"
+                        )
     return problems
 
 

@@ -52,6 +52,14 @@ class VersionAgreementTests(unittest.TestCase):
         self.assertIn(".github/workflows/demo-video.yml:1: release tag v0.4.1", problems)
         self.assertIn(".github/workflows/demo-video.yml:2: release tag v0.4.1", problems)
 
+    def test_stale_demo_action_pin_fails(self):
+        root = self.copy()
+        scene = root / "demo" / "src" / "reel"
+        scene.mkdir(parents=True)
+        (scene / "Adopt.tsx").write_text("uses: bk1202/proofcli@v0.4.1\n", encoding="utf-8")
+        problems = "\n".join(check(root))
+        self.assertIn("demo/src/reel/Adopt.tsx:1: Action pin 0.4.1 != pyproject", problems)
+
     def test_missing_pins_fail_closed(self):
         root = self.copy()
         (root / "README.md").write_text("no pins here\n", encoding="utf-8")

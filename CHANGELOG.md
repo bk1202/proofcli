@@ -9,6 +9,7 @@
 - A timed-out command is reported as `timed out: exceeded the 1s limit` instead of `expected 1; actual True`.
 - In the human output, the `Artifacts:` line now comes before `Temporary directory (removed):`.
 - Motion demos upload only to the GitHub release for the current package version, and only when that release already exists.
+- The demo and motion-demo Action examples show `bk1202/proofcli@v0.4.2`.
 
 ### Added
 
