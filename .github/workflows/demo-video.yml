@@ -68,6 +68,9 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
       - uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53
         with:
           name: motion-demos-v1
@@ -76,14 +79,62 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release upload v0.4.1 motion-demos/* --repo "$GITHUB_REPOSITORY"
-          gh release view v0.4.1 --repo "$GITHUB_REPOSITORY" --json body --jq .body > notes.md
-          python - <<'PY'
+          tag="$(python - <<'PY'
+          import ast
+          import re
+          import sys
           from pathlib import Path
+
+          root = Path('.')
+          section = None
+          pyproject = None
+          for line in (root / 'pyproject.toml').read_text(encoding='utf-8').splitlines():
+              stripped = line.strip()
+              if stripped.startswith('['):
+                  section = stripped
+              elif section == '[project]':
+                  match = re.fullmatch(r'version\s*=\s*"([^"]+)"', stripped)
+                  if match:
+                      pyproject = match.group(1)
+          if not pyproject:
+              sys.exit('pyproject.toml has no [project] version')
+          tree = ast.parse((root / 'proofcli' / '__init__.py').read_text(encoding='utf-8'))
+          module = None
+          for node in tree.body:
+              if isinstance(node, ast.Assign) and any(
+                  getattr(target, 'id', None) == '__version__' for target in node.targets
+              ):
+                  module = ast.literal_eval(node.value)
+          if module != pyproject:
+              sys.exit(
+                  f'refusing to select a release: proofcli.__version__ {module!r} '
+                  f'!= pyproject {pyproject!r}'
+              )
+          if not re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+', pyproject):
+              sys.exit(f'refusing to select a release: unsupported version {pyproject!r}')
+          print(f'v{pyproject}')
+          PY
+          )"
+          echo "Selected release tag ${tag}"
+          if ! gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json tagName --jq .tagName; then
+            echo "Refusing to upload: release ${tag} does not exist" >&2
+            exit 1
+          fi
+          gh release upload "$tag" motion-demos/* --repo "$GITHUB_REPOSITORY"
+          gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json body --jq .body > notes.md
+          TAG="$tag" python - <<'PY'
+          import os
+          from pathlib import Path
+          tag = os.environ['TAG']
           p = Path('notes.md')
           body = p.read_text(encoding='utf-8')
           if 'proofcli-instagram-reel-v1.mp4' not in body:
-              body += '\n\n### 30-second motion demos\n\n[Vertical / Instagram](https://github.com/bk1202/proofcli/releases/download/v0.4.1/proofcli-instagram-reel-v1.mp4) · [Landscape](https://github.com/bk1202/proofcli/releases/download/v0.4.1/proofcli-landscape-motion-v1.mp4)\n\nBoth use results captured from the actual exporter and ProofCLI. Covers, checksums and media validation are attached separately.\n'
+              body += (
+                  '\n\n### 30-second motion demos\n\n'
+                  f'[Vertical / Instagram](https://github.com/bk1202/proofcli/releases/download/{tag}/proofcli-instagram-reel-v1.mp4) · '
+                  f'[Landscape](https://github.com/bk1202/proofcli/releases/download/{tag}/proofcli-landscape-motion-v1.mp4)\n\n'
+                  'Both use results captured from the actual exporter and ProofCLI. Covers, checksums and media validation are attached separately.\n'
+              )
               p.write_text(body, encoding='utf-8')
           PY
-          gh release edit v0.4.1 --repo "$GITHUB_REPOSITORY" --notes-file notes.md
+          gh release edit "$tag" --repo "$GITHUB_REPOSITORY" --notes-file notes.md

@@ -8,10 +8,11 @@
 - Errors that happen before a command runs (missing arguments, a missing or invalid spec, an existing artifact directory, an existing `init` target) now print the error itself instead of `ERROR: command` followed by `Exit: None; elapsed: 0.000s`.
 - A timed-out command is reported as `timed out: exceeded the 1s limit` instead of `expected 1; actual True`.
 - In the human output, the `Artifacts:` line now comes before `Temporary directory (removed):`.
+- Motion demos upload only to the GitHub release for the current package version, and only when that release already exists.
 
 ### Added
 
-- A version-agreement check (`tools/check_versions.py`) that runs in CI and fails when the package version, the README install pins, or the documented Action `@v` references disagree.
+- A version-agreement check (`tools/check_versions.py`) that runs in CI and fails when the package version, the README install pins, the documented Action `@v` references, or a hard-coded release tag in the motion-demo workflow disagree.
 - README examples of the new failure output, and vertical and landscape motion demos attached to the v0.4.1 release.
 
 ### Compatibility

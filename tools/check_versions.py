@@ -2,8 +2,10 @@
 
 Checks pyproject.toml, proofcli.__version__, `pip install proofcli==X.Y.Z` pins,
 `bk1202/proofcli@vX.Y.Z` Action references, and `releases/tag/vX.Y.Z` links in
-README.md and docs/*.md. Historical asset links (`releases/download/...`) and
-CHANGELOG entries are intentionally not checked. Zero dependencies.
+README.md and docs/*.md. Also fails if `.github/workflows/demo-video.yml`
+hard-codes a `gh release` tag or `releases/download` tag other than the package
+version. Historical asset links in the docs and CHANGELOG entries are
+intentionally not checked. Zero dependencies.
 """
 
 import ast
@@ -16,6 +18,11 @@ PATTERNS = {
     "Action pin": re.compile(r"\bbk1202/proofcli@v([0-9]+\.[0-9]+\.[0-9]+[0-9A-Za-z.+-]*)"),
     "release link": re.compile(r"/proofcli/releases/tag/v([0-9]+\.[0-9]+\.[0-9]+[0-9A-Za-z.+-]*)"),
 }
+
+WORKFLOW_TAG = re.compile(
+    r"(?:\bgh release (?:upload|view|edit)\s+[\"']?|/releases/download/)"
+    r"v([0-9]+\.[0-9]+\.[0-9]+[0-9A-Za-z.+-]*)"
+)
 
 
 def _pyproject_version(root):
@@ -61,6 +68,15 @@ def check(root):
                                         f"{kind} {match.group(1)} != pyproject {version}")
     if not found:
         problems.append("no documented pip/Action/release pins found; check the patterns")
+    workflow = root / ".github" / "workflows" / "demo-video.yml"
+    if workflow.is_file():
+        for number, line in enumerate(workflow.read_text(encoding="utf-8").splitlines(), 1):
+            for match in WORKFLOW_TAG.finditer(line):
+                if match.group(1) != version:
+                    problems.append(
+                        f".github/workflows/demo-video.yml:{number}: "
+                        f"release tag v{match.group(1)} != pyproject {version}"
+                    )
     return problems
 
 

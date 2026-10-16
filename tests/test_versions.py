@@ -39,6 +39,19 @@ class VersionAgreementTests(unittest.TestCase):
         self.assertIn("pip pin 0.0.1", problems)
         self.assertIn("Action pin 0.0.1", problems)
 
+    def test_hard_coded_workflow_release_tag_fails(self):
+        root = self.copy()
+        workflow = root / ".github" / "workflows"
+        workflow.mkdir(parents=True)
+        (workflow / "demo-video.yml").write_text(
+            "gh release upload v0.4.1 motion-demos/*\n"
+            "https://github.com/bk1202/proofcli/releases/download/v0.4.1/reel.mp4\n",
+            encoding="utf-8",
+        )
+        problems = "\n".join(check(root))
+        self.assertIn(".github/workflows/demo-video.yml:1: release tag v0.4.1", problems)
+        self.assertIn(".github/workflows/demo-video.yml:2: release tag v0.4.1", problems)
+
     def test_missing_pins_fail_closed(self):
         root = self.copy()
         (root / "README.md").write_text("no pins here\n", encoding="utf-8")
