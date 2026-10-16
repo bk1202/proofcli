@@ -1,14 +1,24 @@
 # Changelog
 
-## Unreleased
+## 0.4.2 — 2026-10-16
 
 ### Changed
 
-- Human-readable output now leads with failing checks: each shows the differing JSON/CSV path, the reason, and the expected and actual values on separate lines as JSON. Passing checks collapse into a count. Child stdout/stderr and the temporary directory are still printed, as before, on passing and failing runs.
-- Errors raised before a command runs (usage errors, missing spec, existing artifact directory, existing `init` target) print the error itself instead of `ERROR: command` and `Exit: None; elapsed: 0.000s`.
-- The timeout check reads `finished in 0.071s (limit 10s)` or `timed out: exceeded the 1s limit` instead of `expected 10; actual False`.
+- Failed checks are easier to read in the terminal. Each failure shows where the output differs (for example `$/rows/1/amount`), why, and the expected and actual values on separate lines. Passing checks are summarized as a count instead of one long line each. Child stdout/stderr and the temporary directory are still printed on passing and failing runs, as before.
+- Errors that happen before a command runs (missing arguments, a missing or invalid spec, an existing artifact directory, an existing `init` target) now print the error itself instead of `ERROR: command` followed by `Exit: None; elapsed: 0.000s`.
+- A timed-out command is reported as `timed out: exceeded the 1s limit` instead of `expected 1; actual True`.
+- In the human output, the `Artifacts:` line now comes before `Temporary directory (removed):`.
+- Motion demos upload only to the GitHub release for the current package version, and only when that release already exists.
+- The demo and motion-demo Action examples show `bk1202/proofcli@v0.4.2`.
 
-No report schema changes: `--json` and `--report` output is identical.
+### Added
+
+- A version-agreement check (`tools/check_versions.py`) that runs in CI and fails when the package version, the README install pins, the documented Action `@v` references, or a hard-coded release tag in the motion-demo workflow disagree.
+- README examples of the new failure output, and vertical and landscape motion demos attached to the v0.4.1 release.
+
+### Compatibility
+
+The JSON report (`--json` and `--report`) is unchanged, and exit codes are unchanged. Scripts that parse the human-readable text may need updating: `[PASS]` lines are gone, `Exit:` is now `Command exit code:`, and pre-execution errors start with `ERROR: <message>`. Use `--json` for machine-readable output.
 
 ## 0.4.1 — 2026-10-15
 

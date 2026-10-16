@@ -46,7 +46,7 @@ Windows (PowerShell):
 
 ```powershell
 py -3 -m venv .venv
-.venv\Scripts\python -m pip install proofcli==0.4.1
+.venv\Scripts\python -m pip install proofcli==0.4.2
 .venv\Scripts\proofcli --help
 ```
 
@@ -54,11 +54,11 @@ macOS:
 
 ```sh
 python3 -m venv .venv
-.venv/bin/python -m pip install proofcli==0.4.1
+.venv/bin/python -m pip install proofcli==0.4.2
 .venv/bin/proofcli --help
 ```
 
-Use the environment's `python -m proofcli` if the console command is not on PATH. From a checkout, use `python -m pip install .`. The [GitHub release](https://github.com/bk1202/proofcli/releases/tag/v0.4.1) also provides a wheel, source archive, and checksums. PyPI uploads follow successful GitHub release validation; see the [publishing workflow](https://github.com/bk1202/proofcli/actions/workflows/pypi.yml) for index availability.
+Use the environment's `python -m proofcli` if the console command is not on PATH. From a checkout, use `python -m pip install .`. The [GitHub release](https://github.com/bk1202/proofcli/releases/tag/v0.4.2) also provides a wheel, source archive, and checksums. PyPI uploads follow successful GitHub release validation; see the [publishing workflow](https://github.com/bk1202/proofcli/actions/workflows/pypi.yml) for index availability.
 
 ### Run your first contract
 
@@ -177,7 +177,7 @@ After checking out your repository, add one step:
 ```yaml
 steps:
   - uses: actions/checkout@v7
-  - uses: bk1202/proofcli@v0.4.1
+  - uses: bk1202/proofcli@v0.4.2
     id: proof
     with:
       spec: tests/export-contract.json
