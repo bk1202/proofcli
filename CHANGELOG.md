@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- `proofcli --help` lists `run`, `validate`, and `init`, each with its own one-line description. `proofcli run --help`, `proofcli validate --help`, and `proofcli init --help` each describe that command instead of sharing one sentence. `proofcli SPEC` still runs a spec, and exit codes are unchanged.
+
 ## 0.4.2 — 2026-10-16
 
 ### Changed

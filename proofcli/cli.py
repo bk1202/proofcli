@@ -15,9 +15,52 @@ from .spec import SpecError, load_spec
 from .process import RunInterrupted
 
 
+# One line each, short enough to stay on one line in an 80-column --help listing.
+_COMMAND_HELP = {
+    "run": "Run an argv command and verify its output contract.",
+    "validate": "Check a spec's schema without executing its command.",
+    "init": "Write a starter spec without executing it.",
+}
+
+_EPILOG = (
+    "Commands: run SPEC, validate SPEC, init PATH. The original proofcli SPEC form also works.\n"
+    "Example: proofcli run contract.json --report verification.json --artifacts evidence\n"
+    "Exit: 0 passed, 1 failed/deadline, 2 invalid/I/O, 130 interrupted, 143 SIGTERM.\n"
+    "Commands/specs must be trusted. See README for limits and assertion semantics."
+)
+
+
 class Parser(argparse.ArgumentParser):
     def error(self, message):
         raise SpecError(message)
+
+
+class _TopLevelParser(Parser):
+    """`proofcli --help` lists subcommands; argument parsing is unchanged."""
+
+    def format_help(self):
+        return _command_list_help()
+
+
+def _command_list_help():
+    parser = argparse.ArgumentParser(
+        prog="proofcli",
+        usage=(
+            "%(prog)s [-h] [--version] [--json] {run,validate,init} ...\n"
+            "       %(prog)s [-h] [--version] [--json] [--report REPORT] "
+            "[--artifacts ARTIFACTS] SPEC"
+        ),
+        description="Verify command output contracts instead of trusting exit code zero.",
+        epilog=_EPILOG,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        allow_abbrev=False,
+    )
+    parser.add_argument("--version", action="version", version=f"ProofCLI {__version__}")
+    parser.add_argument("--json", action="store_true", help="emit a single JSON report")
+    commands = parser.add_subparsers(title="commands", metavar="{run,validate,init}")
+    for name in ("run", "validate", "init"):
+        commands.add_parser(name, help=_COMMAND_HELP[name])
+    return parser.format_help()
 
 
 def _display(value):
@@ -114,13 +157,12 @@ def _human(report):
 
 
 def _parser(command, explicit):
-    parser = Parser(
+    # Help text depends on the command. Parsing does not: an omitted command is still `run`,
+    # so `proofcli SPEC` keeps the same arguments, errors, and exit codes.
+    parser = (_TopLevelParser if not explicit else Parser)(
         prog="proofcli" + (" " + command if explicit else ""),
-        description="Run an argv command and verify its explicit output contract.",
-        epilog=("Commands: run SPEC, validate SPEC, init PATH. The original proofcli SPEC form also works.\n"
-                "Example: proofcli run contract.json --report verification.json --artifacts evidence\n"
-                "Exit: 0 passed, 1 failed/deadline, 2 invalid/I/O, 130 interrupted, 143 SIGTERM.\n"
-                "Commands/specs must be trusted. See README for limits and assertion semantics."),
+        description=_COMMAND_HELP[command],
+        epilog=_EPILOG,
         formatter_class=argparse.RawDescriptionHelpFormatter,
         allow_abbrev=False,
     )
