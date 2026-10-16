@@ -69,6 +69,8 @@ jobs:
         with:
           python-version: '3.13'
       - run: python tools/audit_dependencies.py
+      - name: Check package version and documented pins agree
+        run: python tools/check_versions.py
 
   action:
     runs-on: ${{ matrix.os }}

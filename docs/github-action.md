@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: bk1202/proofcli@v0.4.1
+      - uses: bk1202/proofcli@v0.4.2
         id: proof
         with:
           spec: tests/export-contract.json
