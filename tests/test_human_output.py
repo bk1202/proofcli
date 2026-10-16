@@ -12,6 +12,11 @@ import test_cli
 PROJECT = test_cli.PROJECT
 
 
+def _escaped_child_text(text):
+    """JSON-escape child text the way the formatter does, including print()'s newline."""
+    return json.dumps(text + os.linesep, ensure_ascii=True)
+
+
 class HumanOutputTests(unittest.TestCase):
     # Reuse the spec/invoke helpers without inheriting (and re-running) ProofCLITests.
     setUp = test_cli.ProofCLITests.setUp
@@ -63,7 +68,9 @@ class HumanOutputTests(unittest.TestCase):
         self.assertTrue(lines[2].startswith("  Command exit code: 0; elapsed: "))
         self.assertTrue(lines[3].startswith("  Temporary directory (removed): "))
         # Child logs stay visible on success, as in earlier releases (Action job logs rely on it).
-        self.assertEqual(lines[4], '  stdout: "Export complete: report.json and report.csv\\n"')
+        # print() ends the line with the platform newline (CRLF on Windows).
+        self.assertEqual(lines[4], "  stdout: " + _escaped_child_text(
+            "Export complete: report.json and report.csv"))
         self.assertEqual(len(lines), 5, completed.stdout)
         self.assertNotIn("[PASS]", completed.stdout)
 
@@ -71,8 +78,8 @@ class HumanOutputTests(unittest.TestCase):
         code = "import sys; print('o' * 500); print('e' * 500, file=sys.stderr)"
         completed = self.invoke(self.spec(code, expect={"stdout_regex": "o"}), json_output=False)
         self.assertEqual(completed.returncode, 0, completed.stderr)
-        self.assertIn('  stdout: "' + "o" * 500 + '\\n"', completed.stdout)
-        self.assertIn('  stderr: "' + "e" * 500 + '\\n"', completed.stdout)
+        self.assertIn("  stdout: " + _escaped_child_text("o" * 500), completed.stdout)
+        self.assertIn("  stderr: " + _escaped_child_text("e" * 500), completed.stdout)
 
     def test_exit_code_and_regex_failures_are_readable(self):
         completed = self.invoke(self.spec("import sys; print('hi'); sys.exit(3)",
@@ -81,7 +88,7 @@ class HumanOutputTests(unittest.TestCase):
         self.assertEqual(completed.returncode, 1, completed.stderr)
         self.assertIn("[FAIL] exit_code\n      expected: 0\n      actual:   3", completed.stdout)
         self.assertIn('no match for regex "bye"', completed.stdout)
-        self.assertIn('stdout: "hi\\n"', completed.stdout)
+        self.assertIn("stdout: " + _escaped_child_text("hi"), completed.stdout)
 
     def test_timeout_check_shows_limit_and_outcome(self):
         completed = self.invoke(self.spec("import time; time.sleep(10)", timeout_seconds=1),
