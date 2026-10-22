@@ -251,5 +251,3 @@ python -m unittest discover -s tests -v
 CI exercises the installed wheel on Windows, macOS, and Linux, fresh wheel/sdist installations on Windows/macOS, and the composite Action on all three platforms. Build tools are hash-locked; Actions are pinned to commit IDs. [Release instructions](docs/releasing.md) describe validation, checksums, and PyPI publication.
 
 See [CHANGELOG](CHANGELOG.md), [SECURITY](SECURITY.md), and [CONTRIBUTING](CONTRIBUTING.md). Licensed under [MIT](LICENSE).
-
-Motivation included CLI-Anything issues [#406](https://github.com/HKUDS/CLI-Anything/issues/406) and [#407](https://github.com/HKUDS/CLI-Anything/issues/407). ProofCLI is independently implemented; no CLI-Anything code was copied.
