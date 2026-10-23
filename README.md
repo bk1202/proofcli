@@ -8,7 +8,7 @@ Exit code 0 is not proof the output is right.
 
 Passing starter, no git clone: `python3 -m venv .venv && .venv/bin/python -m pip install proofcli==0.4.2 && .venv/bin/proofcli init demo.json && .venv/bin/proofcli run demo.json`
 
-![ProofCLI fails the broken exporter. Grace's amount is 999.00, expected 8.25. The exporter's exit code is 0. ProofCLI's process exit is 1.](docs/assets/wrong-value-failure.png)
+![ProofCLI fails the broken exporter. Grace's amount is 999.00, expected 8.25. The exporter's exit code is 0. ProofCLI's process exit is 1.](https://raw.githubusercontent.com/bk1202/proofcli/main/docs/assets/wrong-value-failure.png)
 
 ### A command can exit successfully and still produce the wrong result.
 
@@ -27,7 +27,7 @@ Run the command. Check its files. Report what passed and what failed.
 
 ---
 
-![An exporter exits 0 and writes three records, but ProofCLI catches Grace's amount: expected 8.25, actual 999.00. ProofCLI exits 1.](docs/assets/output-contract.png)
+![An exporter exits 0 and writes three records, but ProofCLI catches Grace's amount: expected 8.25, actual 999.00. ProofCLI exits 1.](https://raw.githubusercontent.com/bk1202/proofcli/main/docs/assets/output-contract.png)
 
 The [broken exporter](examples/export/export.py) prints “Export complete” and exits `0`. Its JSON and CSV contain the wrong amount. The [contract](examples/export/wrong-value.json) checks the records and fails with this difference in the actual report:
 

@@ -4,7 +4,7 @@
 
 ### Added
 
-- The README opens with what ProofCLI checks, why an exit code of 0 is not enough, a no-clone try-it, and a still of the broken exporter failing. [docs/ai-agents.md](docs/ai-agents.md) describes using a contract to check changes from an AI coding agent.
+- The README opens with what ProofCLI checks, why an exit code of 0 is not enough, a no-clone try-it, and a still of the broken exporter failing. Those README images use absolute GitHub URLs so they render on PyPI. [docs/ai-agents.md](docs/ai-agents.md) describes using a contract to check changes from an AI coding agent.
 
 ### Changed
 
