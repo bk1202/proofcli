@@ -2,6 +2,14 @@
 
 # ProofCLI
 
+ProofCLI runs a command and checks the files it writes.
+
+Exit code 0 is not proof the output is right.
+
+Passing starter, no git clone: `python3 -m venv .venv && .venv/bin/python -m pip install proofcli==0.4.2 && .venv/bin/proofcli init demo.json && .venv/bin/proofcli run demo.json`
+
+![ProofCLI fails the broken exporter. Grace's amount is 999.00, expected 8.25. The exporter's exit code is 0. ProofCLI's process exit is 1.](docs/assets/wrong-value-failure.png)
+
 ### A command can exit successfully and still produce the wrong result.
 
 Run the command. Check its files. Report what passed and what failed.
@@ -13,7 +21,7 @@ Run the command. Check its files. Report what passed and what failed.
 
 **Windows · macOS · Linux · JSON contracts · Human and JSON reports**
 
-[Quick start](#quick-start) · [See it fail](#see-it-fail) · [Checks](#what-you-can-check) · [Documentation](#documentation) · [Limitations](#limitations)
+[Quick start](#quick-start) · [See it fail](#see-it-fail) · [Checks](#what-you-can-check) · [AI agents](docs/ai-agents.md) · [Documentation](#documentation) · [Limitations](#limitations)
 
 </div>
 
@@ -75,6 +83,20 @@ proofcli run proofcli.json --report verification.json --artifacts evidence
 Artifact directories must be new. Reports are replaced atomically when explicitly reused; the spec, input sources, and retained output paths are protected. Failed files are preserved with `--artifacts`. `--json` emits one JSON object on stdout; child logs stay inside its fields.
 
 ## See it fail
+
+### Try the broken export without cloning
+
+The picture at the top is a real run of this contract. The PyPI 0.4.2 wheel does not include the example. Install from the [quick start](#quick-start), put that environment's `proofcli` on `PATH`, and fetch the contract, the exporter, and the fixture from the `v0.4.2` tag:
+
+```sh
+mkdir -p export-demo/fixtures
+curl -fsSL -o export-demo/wrong-value.json https://raw.githubusercontent.com/bk1202/proofcli/v0.4.2/examples/export/wrong-value.json
+curl -fsSL -o export-demo/export.py https://raw.githubusercontent.com/bk1202/proofcli/v0.4.2/examples/export/export.py
+curl -fsSL -o export-demo/fixtures/input.csv https://raw.githubusercontent.com/bk1202/proofcli/v0.4.2/examples/export/fixtures/input.csv
+proofcli run export-demo/wrong-value.json
+```
+
+ProofCLI exits `1`. The exporter exits `0`. `proofcli init demo.json` writes a passing starter. It does not include this exporter.
 
 With ProofCLI [installed](#quick-start), clone the repository and run the failing contract:
 
@@ -232,6 +254,7 @@ ProofCLI can run inside pytest, a shell script, or CI. Choose a general test fra
 | [Specification](docs/specification.md) | Every contract field, path rule, placeholder, and resource limit. |
 | [Reports](docs/reports.md) | Statuses, diagnostics, interruption handling, and exit codes. |
 | [Use cases](docs/use-cases.md) | Choosing checks for exporters, generators, and workflows. |
+| [AI agents](docs/ai-agents.md) | Run a contract before an agent calls the work done, and run the same check in CI. |
 | [Audit](docs/audit-0.3.md) | Defects found, regression coverage, and unresolved risks. |
 | [Releases](docs/releasing.md) | Build, validation, checksums, and publication. |
 | [Changelog](CHANGELOG.md) | Version history and compatibility changes. |
