@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added
+
+- The README opens with what ProofCLI checks, why an exit code of 0 is not enough, a no-clone try-it, and a still of the broken exporter failing. Those README images use absolute GitHub URLs so they render on PyPI. [docs/ai-agents.md](docs/ai-agents.md) describes using a contract to check changes from an AI coding agent.
+
 ### Changed
 
 - `proofcli --help` lists `run`, `validate`, and `init`, each with its own one-line description. `proofcli run --help`, `proofcli validate --help`, and `proofcli init --help` each describe that command instead of sharing one sentence. `proofcli SPEC` still runs a spec, and exit codes are unchanged.
