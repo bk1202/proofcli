@@ -15,6 +15,7 @@
 - Every pull request and push runs a `release-screenshot` check on Python 3.13. That job installs only the hash-locked Pillow used for the release image, runs the screenshot tests, and fails if one of those tests is skipped or missing. It also uploads the PNG as a workflow artifact.
 - The README limit on child-process cleanup now says Linux and macOS both use process groups. The previous sentence named only macOS.
 - The demo Action examples show `bk1202/proofcli@v0.4.3`.
+- The locked build tools use setuptools 84.1.0, and the motion demo uses Remotion 4.0.543. Those updates clear the setuptools and zod advisories the release checks reported.
 
 ## 0.4.2 — 2026-10-16
 
