@@ -6,7 +6,7 @@ ProofCLI runs a command and checks the files it writes.
 
 Exit code 0 is not proof the output is right.
 
-Passing starter, no git clone: `python3 -m venv .venv && .venv/bin/python -m pip install proofcli==0.4.2 && .venv/bin/proofcli init demo.json && .venv/bin/proofcli run demo.json`
+Passing starter, no git clone: `python3 -m venv .venv && .venv/bin/python -m pip install proofcli==0.4.3 && .venv/bin/proofcli init demo.json && .venv/bin/proofcli run demo.json`
 
 ![ProofCLI fails the broken exporter. Grace's amount is 999.00, expected 8.25. The exporter's exit code is 0. ProofCLI's process exit is 1.](https://raw.githubusercontent.com/bk1202/proofcli/main/docs/assets/wrong-value-failure.png)
 
@@ -54,7 +54,7 @@ Windows (PowerShell):
 
 ```powershell
 py -3 -m venv .venv
-.venv\Scripts\python -m pip install proofcli==0.4.2
+.venv\Scripts\python -m pip install proofcli==0.4.3
 .venv\Scripts\proofcli --help
 ```
 
@@ -62,11 +62,11 @@ macOS:
 
 ```sh
 python3 -m venv .venv
-.venv/bin/python -m pip install proofcli==0.4.2
+.venv/bin/python -m pip install proofcli==0.4.3
 .venv/bin/proofcli --help
 ```
 
-Use the environment's `python -m proofcli` if the console command is not on PATH. From a checkout, use `python -m pip install .`. The [GitHub release](https://github.com/bk1202/proofcli/releases/tag/v0.4.2) also provides a wheel, source archive, and checksums. PyPI uploads follow successful GitHub release validation; see the [publishing workflow](https://github.com/bk1202/proofcli/actions/workflows/pypi.yml) for index availability.
+Use the environment's `python -m proofcli` if the console command is not on PATH. From a checkout, use `python -m pip install .`. The [GitHub release](https://github.com/bk1202/proofcli/releases/tag/v0.4.3) also provides a wheel, source archive, and checksums. PyPI uploads follow successful GitHub release validation; see the [publishing workflow](https://github.com/bk1202/proofcli/actions/workflows/pypi.yml) for index availability.
 
 ### Run your first contract
 
@@ -86,33 +86,20 @@ Artifact directories must be new. Reports are replaced atomically when explicitl
 
 ### Try the broken export without cloning
 
-The picture at the top is a real run of this contract. The PyPI 0.4.2 wheel does not include the example. Install from the [quick start](#quick-start), put that environment's `proofcli` on `PATH`, and fetch the contract, the exporter, and the fixture from the `v0.4.2` tag:
+Install from the [quick start](#quick-start) and put that environment's `proofcli` on `PATH`. This writes a small exporter, a CSV fixture, and a contract. It does not clone the repository or download anything:
 
-```sh
-mkdir -p export-demo/fixtures
-curl -fsSL -o export-demo/wrong-value.json https://raw.githubusercontent.com/bk1202/proofcli/v0.4.2/examples/export/wrong-value.json
-curl -fsSL -o export-demo/export.py https://raw.githubusercontent.com/bk1202/proofcli/v0.4.2/examples/export/export.py
-curl -fsSL -o export-demo/fixtures/input.csv https://raw.githubusercontent.com/bk1202/proofcli/v0.4.2/examples/export/fixtures/input.csv
+```console
+proofcli init --example export-demo
 proofcli run export-demo/wrong-value.json
 ```
 
 ProofCLI exits `1`. The exporter exits `0`. `proofcli init demo.json` writes a passing starter. It does not include this exporter.
 
-With ProofCLI [installed](#quick-start), clone the repository and run the failing contract:
-
-```console
-git clone https://github.com/bk1202/proofcli.git
-cd proofcli
-proofcli run examples/export/wrong-value.json
-```
-
-**Expected outcome: ProofCLI exits `1`, while the exporter exits `0`.** The exporter creates valid, nonempty JSON and CSV, silently changing Grace's amount to `999.00` while keeping the original total. Its success message, row-count check, and JSON summary check still pass. Exact record assertions identify `$/rows/1/amount`: expected `8.25`, actual `999.00`.
-
-The terminal report leads with what failed:
+**Expected outcome: ProofCLI exits `1`, while the exporter exits `0`.** The exporter writes JSON and CSV, changing Grace's amount to `999.00`. The record checks name `$/rows/1/amount`: expected `8.25`, actual `999.00`.
 
 ```text
 FAILED: False success: wrong-value
-  2 of 9 checks failed:
+  2 of 8 checks failed:
   [FAIL] file:report.json:json_equals
       at $/rows/1/amount: value or type differs
         expected: "8.25"
@@ -121,9 +108,17 @@ FAILED: False success: wrong-value
       at $/rows/1/amount: value or type differs
         expected: "8.25"
         actual:   "999.00"
-  7 other checks passed.
-  Command exit code: 0; elapsed: 0.069s
+  6 other checks passed.
+  Command exit code: 0; elapsed: 0.064s
   ...
+```
+
+The picture at the top is a real run of the fuller contract in this repository, [examples/export/wrong-value.json](examples/export/wrong-value.json). That exporter keeps the original total. Its success message, row-count check, and JSON summary check still pass, and two record checks fail on the same amount. With ProofCLI [installed](#quick-start):
+
+```console
+git clone https://github.com/bk1202/proofcli.git
+cd proofcli
+proofcli run examples/export/wrong-value.json
 ```
 
 Run the correct exporter for comparison, or keep the failed files and report for inspection:
@@ -199,7 +194,7 @@ After checking out your repository, add one step:
 ```yaml
 steps:
   - uses: actions/checkout@v7
-  - uses: bk1202/proofcli@v0.4.2
+  - uses: bk1202/proofcli@v0.4.3
     id: proof
     with:
       spec: tests/export-contract.json

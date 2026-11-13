@@ -40,12 +40,12 @@ The [GitHub Action](github-action.md) checks out nothing by itself. After `actio
 ```yaml
 steps:
   - uses: actions/checkout@v7
-  - uses: bk1202/proofcli@v0.4.2
+  - uses: bk1202/proofcli@v0.4.3
     with:
       spec: examples/export/good.json
 ```
 
-Change `spec` to the contract that should pass for the pull request. The Action exposes `report`, `status`, and `exit-code` outputs. Optional `report` and `artifacts` inputs choose where evidence is saved. Pin a full commit SHA instead of `@v0.4.2` when the workflow needs an immutable action.
+Change `spec` to the contract that should pass for the pull request. The Action exposes `report`, `status`, and `exit-code` outputs. Optional `report` and `artifacts` inputs choose where evidence is saved. Pin a full commit SHA instead of `@v0.4.3` when the workflow needs an immutable action.
 
 ## Limits
 

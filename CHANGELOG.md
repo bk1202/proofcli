@@ -1,16 +1,21 @@
 # Changelog
 
-## Unreleased
+## 0.4.3 — 2026-11-13
 
 ### Added
 
 - The README opens with what ProofCLI checks, why an exit code of 0 is not enough, a no-clone try-it, and a still of the broken exporter failing. Those README images use absolute GitHub URLs so they render on PyPI. [docs/ai-agents.md](docs/ai-agents.md) describes using a contract to check changes from an AI coding agent.
+- `proofcli init --example DIRECTORY` writes a small exporter, a CSV fixture, and a contract. It needs no clone and no network. The exporter exits 0. ProofCLI exits 1 because Grace's amount is 999.00 where 8.25 was expected. Existing files are left alone unless you pass `--force`. `proofcli init FILE` still writes the passing starter. The README uses this command for the no-clone failure demo.
+- [docs/yanking.md](docs/yanking.md) describes how to yank a bad PyPI release and ship a fix. The PyPI publish job waits for approval from bk1202 before it uploads.
 
 ### Changed
 
 - `proofcli --help` lists `run`, `validate`, and `init`, each with its own one-line description. `proofcli run --help`, `proofcli validate --help`, and `proofcli init --help` each describe that command instead of sharing one sentence. `proofcli SPEC` still runs a spec, and exit codes are unchanged.
 - GitHub releases now attach one PNG of real ProofCLI output: the failing export check and the passing run. The image is drawn with a vendored monospace font. Pillow is installed only while that release image is built, and ProofCLI itself still has no runtime dependencies. The release workflow no longer renders a demo video or installs the Remotion tools, so a video render cannot block the GitHub release or the PyPI publish that follows it. The motion-demo workflow can still render preview videos as workflow artifacts, and it no longer uploads those videos to a release.
 - Every pull request and push runs a `release-screenshot` check on Python 3.13. That job installs only the hash-locked Pillow used for the release image, runs the screenshot tests, and fails if one of those tests is skipped or missing. It also uploads the PNG as a workflow artifact.
+- The README limit on child-process cleanup now says Linux and macOS both use process groups. The previous sentence named only macOS.
+- The demo Action examples show `bk1202/proofcli@v0.4.3`.
+- The locked build tools use setuptools 84.1.0, and the motion demo uses Remotion 4.0.543. Those updates clear the setuptools and zod advisories the release checks reported.
 
 ## 0.4.2 — 2026-10-16
 

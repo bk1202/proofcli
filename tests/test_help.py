@@ -111,9 +111,13 @@ class HelpTests(unittest.TestCase):
         )
         self.assertEqual(
             usage_block(seen["init"]),
-            "usage: proofcli init [-h] [--version] [--json] [--force] path",
+            "usage: proofcli init [-h] [--version] [--json] [--force] [--example] path",
         )
         self.assertIn("replace an existing spec", seen["init"])
+        self.assertIn("--example", seen["init"])
+        self.assertIn("999.00", seen["init"])
+        self.assertNotIn("--example", seen["run"])
+        self.assertNotIn("--example", seen["validate"])
         self.assertIn("save the complete JSON report to this path", seen["run"])
         self.assertNotIn("save the complete JSON report", seen["validate"])
         self.assertNotIn("replace an existing spec", seen["validate"])
@@ -173,6 +177,7 @@ class HelpTests(unittest.TestCase):
             (["run"], "the following arguments are required: spec"),
             (["validate"], "the following arguments are required: spec"),
             (["init"], "the following arguments are required: path"),
+            (["init", "--example"], "the following arguments are required: path"),
             (["--bogus"], "the following arguments are required: spec"),
             (["run", missing, "--art", "x"], "unrecognized arguments: --art"),
             (["--report", "--help"], "argument --report: expected one argument"),
