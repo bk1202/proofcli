@@ -169,8 +169,12 @@ def _parser(command, explicit):
     parser.add_argument("--version", action="version", version=f"ProofCLI {__version__}")
     parser.add_argument("--json", action="store_true", help="emit a single JSON report")
     if command == "init":
-        parser.add_argument("path", help="where to create the starter JSON spec")
-        parser.add_argument("--force", action="store_true", help="replace an existing spec")
+        parser.add_argument("path", help="starter spec file, or a directory with --example")
+        parser.add_argument("--force", action="store_true", help="replace an existing spec or example")
+        parser.add_argument(
+            "--example", action="store_true",
+            help="write a demo that fails on 999.00 instead of 8.25",
+        )
     else:
         parser.add_argument("spec", help="path to a version 1 JSON spec")
         if command == "run":
@@ -215,7 +219,114 @@ def _save_report(path, report):
             temporary.unlink(missing_ok=True)
 
 
-def _init(path, force):
+_EXAMPLE_CSV = "id,customer,amount\n1,Ada,12.50\n2,Grace,8.25\n3,Linus,13.00\n"
+
+# Joined lines so the generated script contains a real "\n" string, on every platform.
+_EXAMPLE_SCRIPT = "\n".join([
+    '"""Write report.json and report.csv from input.csv.',
+    "",
+    "The second amount is written as 999.00. The process still exits 0.",
+    '"""',
+    "",
+    "import csv",
+    "import json",
+    "from pathlib import Path",
+    "",
+    "",
+    "def main():",
+    '    with Path("input.csv").open(encoding="utf-8", newline="") as handle:',
+    "        rows = list(csv.DictReader(handle))",
+    '    rows[1]["amount"] = "999.00"',
+    '    text = json.dumps({"rows": rows}, indent=2) + "\\n"',
+    '    Path("report.json").write_text(text, encoding="utf-8")',
+    '    with Path("report.csv").open("w", encoding="utf-8", newline="") as handle:',
+    '        writer = csv.DictWriter(handle, fieldnames=["id", "customer", "amount"])',
+    "        writer.writeheader()",
+    "        writer.writerows(rows)",
+    '    print("Export complete")',
+    "",
+    "",
+    'if __name__ == "__main__":',
+    "    main()",
+    "",
+])
+
+
+def _example_spec():
+    rows = [
+        {"id": "1", "customer": "Ada", "amount": "12.50"},
+        {"id": "2", "customer": "Grace", "amount": "8.25"},
+        {"id": "3", "customer": "Linus", "amount": "13.00"},
+    ]
+    return {
+        "version": 1,
+        "name": "False success: wrong-value",
+        "argv": ["{python}", "{spec_dir}/export.py"],
+        "inputs": [{"source": "fixtures/input.csv", "dest": "input.csv"}],
+        "timeout_seconds": 10,
+        "expect": {
+            "exit_code": 0,
+            "stdout_regex": "Export complete",
+            "files": [
+                {"path": "report.json", "min_size": 1, "json_equals": {"rows": rows}},
+                {
+                    "path": "report.csv",
+                    "min_size": 1,
+                    "csv": {
+                        "columns": ["id", "customer", "amount"],
+                        "exact_columns": True,
+                        "rows": rows,
+                    },
+                },
+            ],
+        },
+    }
+
+
+def _path_occupied(path):
+    """True for a real file or directory and for a dangling link."""
+    return path.is_symlink() or path.exists()
+
+
+def _init_example(directory, force):
+    """Write a self-contained failing demo. Refuse to replace anything without --force."""
+    directory = Path(directory).absolute()
+    if directory.is_symlink():
+        raise SpecError("example path is a link; choose a directory")
+    if _path_occupied(directory) and not directory.is_dir():
+        raise SpecError("example path is a file; choose a directory")
+    spec_text = json.dumps(_example_spec(), ensure_ascii=True, indent=2) + "\n"
+    files = [
+        (directory / "wrong-value.json", spec_text),
+        (directory / "export.py", _EXAMPLE_SCRIPT),
+        (directory / "fixtures" / "input.csv", _EXAMPLE_CSV),
+    ]
+    for path, _text in files:
+        parent = path.parent
+        if parent.is_symlink() or (_path_occupied(parent) and not parent.is_dir()):
+            raise SpecError(f"cannot create example files; {parent} is not a directory")
+        if path.is_dir() and not path.is_symlink():
+            raise SpecError(f"{path} is a directory; choose a path that can hold a file")
+    blocked = [path for path, _text in files if _path_occupied(path)]
+    if blocked and not force:
+        raise SpecError("example file already exists; use --force to replace it")
+    directory.mkdir(parents=True, exist_ok=True)
+    try:
+        for path, text in files:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            if path.is_symlink():
+                # Replace the link itself. Do not follow it and edit another file.
+                path.unlink()
+            with path.open("w" if force else "x", encoding="utf-8", newline="\n") as handle:
+                handle.write(text)
+    except FileExistsError as exc:
+        raise SpecError("example file already exists; use --force to replace it") from exc
+    return {"schema_version": 1, "status": "created", "path": str(directory / "wrong-value.json")}
+
+
+def _init(path, force, example=False):
+    if example:
+        return _init_example(path, force)
     # Preserve a final symlink for exclusive creation: even a dangling link exists.
     path = Path(path).absolute()
     spec = {
@@ -261,7 +372,7 @@ def _main(argv=None):
         args = parser.parse_args(tokens)
         json_output = args.json
         if command == "init":
-            report = _init(args.path, args.force)
+            report = _init(args.path, args.force, args.example)
         else:
             spec_path = Path(args.spec).resolve()
             # Preserve an error report for malformed/missing specs without ever

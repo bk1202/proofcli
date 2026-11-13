@@ -94,6 +94,86 @@ class QualityOfLifeTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("proofcli run", result.stdout)
 
+    def _run_printed_command(self, stdout):
+        """Run the `Next: proofcli run "..."` line with the same CLI subprocess."""
+        line = next(item for item in stdout.splitlines() if "Next:" in item)
+        self.assertIn("proofcli run ", line)
+        quoted = line.split("proofcli run ", 1)[1].strip()
+        self.assertTrue(quoted.startswith('"') and quoted.endswith('"'), stdout)
+        spec = quoted[1:-1]
+        installed = os.environ.get("PROOFCLI_TEST_INSTALLED") == "1"
+        env = os.environ.copy()
+        if installed:
+            executable = shutil.which("proofcli")
+            self.assertIsNotNone(executable, "Installed mode requires proofcli on PATH")
+            argv = [executable, "run", spec]
+            env.pop("PYTHONPATH", None)
+        else:
+            argv = [sys.executable, "-m", "proofcli", "run", spec]
+            env["PYTHONPATH"] = os.pathsep.join([str(PROJECT), env.get("PYTHONPATH", "")])
+        return subprocess.run(
+            argv, cwd=self.root, env=env, capture_output=True, text=True,
+            encoding="utf-8", errors="replace", timeout=30,
+        ), spec
+
+    def test_init_example_writes_a_demo_that_fails_on_the_wrong_amount(self):
+        directory = self.root / "export-demo"
+        result = self.invoke(["init", "--example", directory], json_output=False)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        spec_path = directory / "wrong-value.json"
+        script_path = directory / "export.py"
+        fixture_path = directory / "fixtures" / "input.csv"
+        self.assertTrue(spec_path.is_file(), result.stdout)
+        self.assertTrue(script_path.is_file())
+        self.assertTrue(fixture_path.is_file())
+        self.assertFalse((directory / "report.json").exists())
+        spec = json.loads(spec_path.read_text(encoding="utf-8"))
+        self.assertEqual(spec["argv"][0], "{python}")
+        self.assertNotIn("sh", spec["argv"])
+        self.assertNotIn("bash", spec["argv"])
+        self.assertNotIn("cmd", spec["argv"])
+        completed, printed_spec = self._run_printed_command(result.stdout)
+        self.assertEqual(Path(printed_spec), spec_path)
+        self.assertEqual(completed.returncode, 1, completed.stdout + completed.stderr)
+        self.assertIn('expected: "8.25"', completed.stdout)
+        self.assertIn('actual:   "999.00"', completed.stdout)
+
+    def test_init_example_refuses_to_overwrite_existing_files(self):
+        directory = self.root / "export-demo"
+        (directory / "fixtures").mkdir(parents=True)
+        kept = directory / "fixtures" / "input.csv"
+        kept.write_text("original fixture", encoding="utf-8")
+        result = self.invoke(["init", "--example", directory], json_output=False)
+        self.assertEqual(result.returncode, 2, result.stdout)
+        self.assertEqual(result.stdout, "")
+        self.assertIn("already exists", result.stderr)
+        self.assertIn("--force", result.stderr)
+        self.assertEqual(kept.read_text(encoding="utf-8"), "original fixture")
+        self.assertFalse((directory / "wrong-value.json").exists())
+        self.assertFalse((directory / "export.py").exists())
+        replaced = self.invoke(["init", "--example", directory, "--force"], json_output=False)
+        self.assertEqual(replaced.returncode, 0, replaced.stderr)
+        self.assertNotEqual(kept.read_text(encoding="utf-8"), "original fixture")
+        completed, _spec = self._run_printed_command(replaced.stdout)
+        self.assertEqual(completed.returncode, 1, completed.stdout + completed.stderr)
+        self.assertIn('expected: "8.25"', completed.stdout)
+        self.assertIn('actual:   "999.00"', completed.stdout)
+
+    def test_plain_init_still_writes_a_passing_starter(self):
+        path = self.root / "starter.json"
+        result = self.invoke(["init", path], json_output=False)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual([item.name for item in self.root.iterdir()], ["starter.json"])
+        generated = json.loads(path.read_text(encoding="utf-8"))
+        self.assertEqual(generated["argv"][:2], ["{python}", "-c"])
+        self.assertIn("ProofCLI verified this output.", generated["argv"][2])
+        self.assertEqual(generated["expect"]["exit_code"], 0)
+        self.assertNotIn("999.00", path.read_text(encoding="utf-8"))
+        self.assertNotIn("--example", result.stdout)
+        run = self.invoke(["run", path], json_output=False)
+        self.assertEqual(run.returncode, 0, run.stderr)
+        self.assertIn("PASSED", run.stdout)
+
     def test_validate_does_not_execute_the_command(self):
         path = self.marker_spec()
         report = self.assert_report(self.invoke(["validate", path]), 0, "valid")
